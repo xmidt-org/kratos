@@ -1,10 +1,4 @@
 #output
-bin
-src/example/example
-src/kratos/*.out
-src/github.com
-src/golang.org
-
-#built files
-pkg
+example/example
+*.out
 
