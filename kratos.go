@@ -187,7 +187,7 @@ func resolveURL(deviceId string, fabricUrl string) (*url.URL, error) {
 		return nil, err
 	}
 
-	// add the device name and MAC addres to the http header
+	// add the device name and MAC address to the http header
 	// TODO: do we need to populate the header with everything here, too?
 	req.Header.Add("X-Webpa-Device-Name", deviceId)
 
