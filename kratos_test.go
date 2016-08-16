@@ -55,7 +55,7 @@ var (
 
 	goodMsg []byte
 
-	GoodError = errors.New("This was supposed to happen.")
+	ErrFoo = errors.New("This was supposed to happen.")
 
 	upgrader = &websocket.Upgrader{
 		ReadBufferSize:  socketBufferSize,
@@ -204,7 +204,7 @@ func TestSendBrokenWriteMessage(t *testing.T) {
 	testClient := &client{}
 	testClient.connection = fakeConn
 
-	fakeConn.On("WriteMessage", 1, buffer.Bytes()).Return(GoodError).Once()
+	fakeConn.On("WriteMessage", 1, buffer.Bytes()).Return(ErrFoo).Once()
 
 	fakeMsg.On(
 		"WriteTo",
@@ -230,7 +230,7 @@ func TestSendBrokenWriter(t *testing.T) {
 	fakeMsg.On(
 		"WriteTo",
 		mock.MatchedBy(func(io.Writer) bool { return true }),
-	).Return(int64(expectedByteCount), GoodError).Once()
+	).Return(int64(expectedByteCount), ErrFoo).Once()
 
 	err := testClient.Send(fakeMsg)
 
@@ -263,7 +263,7 @@ func TestCloseBroken(t *testing.T) {
 	testClient := &client{}
 	testClient.connection = fakeConn
 
-	fakeConn.On("Close").Return(GoodError).Once()
+	fakeConn.On("Close").Return(ErrFoo).Once()
 
 	err := testClient.Close()
 
@@ -309,7 +309,7 @@ func TestReadBrokenReadMessage(t *testing.T) {
 		headerInfo:      nil,
 	}
 
-	fakeConn.On("ReadMessage").Return(0, goodMsg, GoodError).Once()
+	fakeConn.On("ReadMessage").Return(0, goodMsg, ErrFoo).Once()
 
 	err := testClient.read()
 

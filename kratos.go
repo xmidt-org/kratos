@@ -12,11 +12,13 @@ import (
 	"strings"
 )
 
+// ReadHandler should be implemented by the user so that they
+// may deal with received messages how they please
 type ReadHandler interface {
 	HandleMessage(msg interface{})
 }
 
-// what we expose to the user of kratos
+// Client is what function calls we expose to the user of kratos
 type Client interface {
 	Send(io.WriterTo) error
 	Close() error
@@ -28,7 +30,8 @@ type websocketConnection interface {
 	Close() error
 }
 
-// internal data type for Client interface
+// HandlerRegistry is an internal data type for Client interface
+// that helps keep track of registered handler functions
 type HandlerRegistry struct {
 	HandlerKey string
 	keyRegex   *regexp.Regexp
@@ -52,7 +55,7 @@ type clientHeader struct {
 	manufacturer string
 }
 
-// factory used to generate a client
+// ClientFactory is used to generate a client by calling new on this type
 type ClientFactory struct {
 	DeviceName     string
 	FirmwareName   string
@@ -88,7 +91,7 @@ func (c *client) Close() error {
 	return nil
 }
 
-// used to create a new kratos Client
+// New is used to create a new kratos Client from a ClientFactory
 func (f *ClientFactory) New() (Client, error) {
 	inHeader := &clientHeader{
 		deviceName:   f.DeviceName,
