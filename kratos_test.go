@@ -27,21 +27,21 @@ var (
 		Manufacturer:   "ARRIS Group, Inc.",
 		DestinationUrl: "",
 		Handlers: []HandlerRegistry{
-			HandlerRegistry{
+			{
 				HandlerKey: "/foo",
 				Handler: &myReadHandler{
 					helloMsg:   "Hello.",
 					goodbyeMsg: "I am Kratos.",
 				},
 			},
-			HandlerRegistry{
+			{
 				HandlerKey: "/bar",
 				Handler: &myReadHandler{
 					helloMsg:   "Whaddup.",
 					goodbyeMsg: "It's dat boi Kratos.",
 				},
 			},
-			HandlerRegistry{
+			{
 				HandlerKey: "/.*",
 				Handler: &myReadHandler{
 					helloMsg:   "Hey.",

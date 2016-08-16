@@ -36,21 +36,21 @@ func main() {
 		Manufacturer:   "ARRIS Group, Inc.",
 		DestinationUrl: "https://fabric-cd.webpa.comcast.net:8080/api/v2/device",
 		Handlers: []kratos.HandlerRegistry{
-			kratos.HandlerRegistry{
+			{
 				HandlerKey: "/foo",
 				Handler: &myReadHandler{
 					helloMsg:   "Hello.",
 					goodbyeMsg: "I am Kratos.",
 				},
 			},
-			kratos.HandlerRegistry{
+			{
 				HandlerKey: "/bar",
 				Handler: &myReadHandler{
 					helloMsg:   "Hi.",
 					goodbyeMsg: "My name is Kratos.",
 				},
 			},
-			kratos.HandlerRegistry{
+			{
 				HandlerKey: ".*",
 				Handler: &myReadHandler{
 					helloMsg:   "Hey.",

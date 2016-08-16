@@ -111,7 +111,7 @@ func (f *ClientFactory) New() (Client, error) {
 		headerInfo:      inHeader,
 	}
 
-	for i, _ := range newClient.handlers {
+	for i := range newClient.handlers {
 		newClient.handlers[i].keyRegex, err = regexp.Compile(newClient.handlers[i].HandlerKey)
 		if err != nil {
 			return nil, err
