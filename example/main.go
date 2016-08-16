@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
+	"github.com/comcast/kratos"
 	"github.com/comcast/webpa-common/wrp"
 	"github.com/nu7hatch/gouuid"
-	"kratos"
 	"sync"
 )
 
