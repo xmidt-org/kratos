@@ -128,21 +128,23 @@ func (f *ClientFactory) New() (Client, error) {
 
 // going to be used to access the HandleMessage() function
 func (c *client) read() error {
-	_, serverMessage, err := c.connection.ReadMessage()
-	if err != nil {
-		return err
-	}
+	for {
+		_, serverMessage, err := c.connection.ReadMessage()
+		if err != nil {
+			return err
+		}
 
-	// decode the message so we can read it
-	data, err := wrp.Decode(serverMessage)
-	if err != nil {
-		return err
-	}
+		// decode the message so we can read it
+		data, err := wrp.Decode(serverMessage)
+		if err != nil {
+			return err
+		}
 
-	if _, ok := data.(wrp.WrpMsg); ok {
-		for i := 0; i < len(c.handlers); i++ {
-			if c.handlers[i].keyRegex.MatchString(data.(wrp.WrpMsg).Destination()) {
-				c.handlers[i].Handler.HandleMessage(data)
+		if _, ok := data.(wrp.WrpMsg); ok {
+			for i := 0; i < len(c.handlers); i++ {
+				if c.handlers[i].keyRegex.MatchString(data.(wrp.WrpMsg).Destination()) {
+					c.handlers[i].Handler.HandleMessage(data)
+				}
 			}
 		}
 	}
