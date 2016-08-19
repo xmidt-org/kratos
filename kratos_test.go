@@ -271,68 +271,68 @@ func TestCloseBroken(t *testing.T) {
 	fakeConn.AssertExpectations(t)
 }
 
-// test the happy path of receiving a message from the server via websocket
-// users will never make function calls to this, in the normal use case
-// they simply provide a handler and let a go routine deal with this call
-func TestRead(t *testing.T) {
-	assert := assert.New(t)
-	fakeConn := &mockConnection{}
-
-	testClient := &client{
-		deviceId:        testClientFactory.DeviceName,
-		userAgent:       "",
-		deviceProtocols: "",
-		handlers:        testClientFactory.Handlers,
-		connection:      fakeConn,
-		headerInfo:      nil,
-	}
-
-	fakeConn.On("ReadMessage").Return(0, goodMsg, nil).Once()
-
-	err := testClient.read()
-
-	assert.Nil(err)
-	fakeConn.AssertExpectations(t)
-}
-
-// test what happens when the call to `websocket.Conn.ReadMessage` fails
-func TestReadBrokenReadMessage(t *testing.T) {
-	assert := assert.New(t)
-	fakeConn := &mockConnection{}
-
-	testClient := &client{
-		deviceId:        testClientFactory.DeviceName,
-		userAgent:       "",
-		deviceProtocols: "",
-		handlers:        testClientFactory.Handlers,
-		connection:      fakeConn,
-		headerInfo:      nil,
-	}
-
-	fakeConn.On("ReadMessage").Return(0, goodMsg, ErrFoo).Once()
-
-	err := testClient.read()
-
-	assert.NotNil(err)
-	fakeConn.AssertExpectations(t)
-}
-
-// test what happens when we receive a message type that wrp does not expect
-func TestReadBrokenMessageType(t *testing.T) {
-	assert := assert.New(t)
-	fakeConn := &mockConnection{}
-
-	// this shouldn't work because wrp specifies the types of variables it wants
-	// and this isn't one of those variables
-	brokenMsg := []byte("This shouldn't work.")
-
-	testClient := &client{}
-	testClient.connection = fakeConn
-
-	fakeConn.On("ReadMessage").Return(0, brokenMsg, nil).Once()
-
-	err := testClient.read()
-
-	assert.NotNil(err)
-	fakeConn.AssertExpectations(t)
-}
+// // test the happy path of receiving a message from the server via websocket
+// // users will never make function calls to this, in the normal use case
+// // they simply provide a handler and let a go routine deal with this call
+// func TestRead(t *testing.T) {
+// 	assert := assert.New(t)
+// 	fakeConn := &mockConnection{}
+//
+// 	testClient := &client{
+// 		deviceId:        testClientFactory.DeviceName,
+// 		userAgent:       "",
+// 		deviceProtocols: "",
+// 		handlers:        testClientFactory.Handlers,
+// 		connection:      fakeConn,
+// 		headerInfo:      nil,
+// 	}
+//
+// 	fakeConn.On("ReadMessage").Return(0, goodMsg, nil).Once()
+//
+// 	err := testClient.read()
+//
+// 	assert.Nil(err)
+// 	fakeConn.AssertExpectations(t)
+// }
+//
+// // test what happens when the call to `websocket.Conn.ReadMessage` fails
+// func TestReadBrokenReadMessage(t *testing.T) {
+// 	assert := assert.New(t)
+// 	fakeConn := &mockConnection{}
+//
+// 	testClient := &client{
+// 		deviceId:        testClientFactory.DeviceName,
+// 		userAgent:       "",
+// 		deviceProtocols: "",
+// 		handlers:        testClientFactory.Handlers,
+// 		connection:      fakeConn,
+// 		headerInfo:      nil,
+// 	}
+//
+// 	fakeConn.On("ReadMessage").Return(0, goodMsg, ErrFoo).Once()
+//
+// 	err := testClient.read()
+//
+// 	assert.NotNil(err)
+// 	fakeConn.AssertExpectations(t)
+// }
+//
+// // test what happens when we receive a message type that wrp does not expect
+// func TestReadBrokenMessageType(t *testing.T) {
+// 	assert := assert.New(t)
+// 	fakeConn := &mockConnection{}
+//
+// 	// this shouldn't work because wrp specifies the types of variables it wants
+// 	// and this isn't one of those variables
+// 	brokenMsg := []byte("This shouldn't work.")
+//
+// 	testClient := &client{}
+// 	testClient.connection = fakeConn
+//
+// 	fakeConn.On("ReadMessage").Return(0, brokenMsg, nil).Once()
+//
+// 	err := testClient.read()
+//
+// 	assert.NotNil(err)
+// 	fakeConn.AssertExpectations(t)
+// }
