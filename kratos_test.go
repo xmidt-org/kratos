@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"regexp"
 	"sync"
 	"testing"
 )
@@ -20,6 +21,8 @@ const (
 )
 
 var (
+	// handlerCalled is true and used for synchronization, true meaning that
+	// we don't need to worry about synchronization (mainly for calls to TestRead)
 	testClientFactory = &ClientFactory{
 		DeviceName:     "mac:ffffff112233",
 		FirmwareName:   "TG1682_2.1p7s1_PROD_sey",
@@ -30,22 +33,25 @@ var (
 			{
 				HandlerKey: "/foo",
 				Handler: &myReadHandler{
-					helloMsg:   "Hello.",
-					goodbyeMsg: "I am Kratos.",
+					helloMsg:      "Hello.",
+					goodbyeMsg:    "I am Kratos.",
+					handlerCalled: true,
 				},
 			},
 			{
 				HandlerKey: "/bar",
 				Handler: &myReadHandler{
-					helloMsg:   "Whaddup.",
-					goodbyeMsg: "It's dat boi Kratos.",
+					helloMsg:      "Whaddup.",
+					goodbyeMsg:    "It's dat boi Kratos.",
+					handlerCalled: true,
 				},
 			},
 			{
 				HandlerKey: "/.*",
 				Handler: &myReadHandler{
-					helloMsg:   "Hey.",
-					goodbyeMsg: "Have you met Kratos?",
+					helloMsg:      "Hey.",
+					goodbyeMsg:    "Have you met Kratos?",
+					handlerCalled: true,
 				},
 			},
 		},
@@ -97,12 +103,16 @@ func (m *mockMessage) WriteTo(output io.Writer) (int64, error) {
 /******************* END MOCK DECLARATIONS ************************/
 
 type myReadHandler struct {
-	helloMsg   string
-	goodbyeMsg string
+	helloMsg      string
+	goodbyeMsg    string
+	handlerCalled bool
 }
 
 func (m *myReadHandler) HandleMessage(msg interface{}) {
-	// do nothing
+	if !m.handlerCalled {
+		mainWG.Done()
+		m.handlerCalled = true
+	}
 }
 
 func TestMain(m *testing.M) {
@@ -271,68 +281,43 @@ func TestCloseBroken(t *testing.T) {
 	fakeConn.AssertExpectations(t)
 }
 
-// // test the happy path of receiving a message from the server via websocket
-// // users will never make function calls to this, in the normal use case
-// // they simply provide a handler and let a go routine deal with this call
-// func TestRead(t *testing.T) {
-// 	assert := assert.New(t)
-// 	fakeConn := &mockConnection{}
-//
-// 	testClient := &client{
-// 		deviceId:        testClientFactory.DeviceName,
-// 		userAgent:       "",
-// 		deviceProtocols: "",
-// 		handlers:        testClientFactory.Handlers,
-// 		connection:      fakeConn,
-// 		headerInfo:      nil,
-// 	}
-//
-// 	fakeConn.On("ReadMessage").Return(0, goodMsg, nil).Once()
-//
-// 	err := testClient.read()
-//
-// 	assert.Nil(err)
-// 	fakeConn.AssertExpectations(t)
-// }
-//
-// // test what happens when the call to `websocket.Conn.ReadMessage` fails
-// func TestReadBrokenReadMessage(t *testing.T) {
-// 	assert := assert.New(t)
-// 	fakeConn := &mockConnection{}
-//
-// 	testClient := &client{
-// 		deviceId:        testClientFactory.DeviceName,
-// 		userAgent:       "",
-// 		deviceProtocols: "",
-// 		handlers:        testClientFactory.Handlers,
-// 		connection:      fakeConn,
-// 		headerInfo:      nil,
-// 	}
-//
-// 	fakeConn.On("ReadMessage").Return(0, goodMsg, ErrFoo).Once()
-//
-// 	err := testClient.read()
-//
-// 	assert.NotNil(err)
-// 	fakeConn.AssertExpectations(t)
-// }
-//
-// // test what happens when we receive a message type that wrp does not expect
-// func TestReadBrokenMessageType(t *testing.T) {
-// 	assert := assert.New(t)
-// 	fakeConn := &mockConnection{}
-//
-// 	// this shouldn't work because wrp specifies the types of variables it wants
-// 	// and this isn't one of those variables
-// 	brokenMsg := []byte("This shouldn't work.")
-//
-// 	testClient := &client{}
-// 	testClient.connection = fakeConn
-//
-// 	fakeConn.On("ReadMessage").Return(0, brokenMsg, nil).Once()
-//
-// 	err := testClient.read()
-//
-// 	assert.NotNil(err)
-// 	fakeConn.AssertExpectations(t)
-// }
+// test the happy path of receiving a message from the server via websocket
+// users will never make function calls to this, in the normal use case
+// they simply provide a handler and let a go routine deal with this call
+func TestRead(t *testing.T) {
+	assert := assert.New(t)
+	fakeConn := &mockConnection{}
+
+	testClient := &client{
+		deviceId:        testClientFactory.DeviceName,
+		userAgent:       "",
+		deviceProtocols: "",
+		handlers: []HandlerRegistry{
+			{
+				HandlerKey: "/bar",
+				Handler: &myReadHandler{
+					helloMsg:      "Whaddup.",
+					goodbyeMsg:    "It's dat boi Kratos.",
+					handlerCalled: false,
+				},
+			},
+		},
+		connection: fakeConn,
+		headerInfo: nil,
+	}
+
+	testClient.handlers[0].keyRegex, _ = regexp.Compile(testClient.handlers[0].HandlerKey)
+
+	fakeConn.On("ReadMessage").Return(0, goodMsg, nil)
+
+	mainWG.Add(1)
+	var err error
+	go func() {
+		err = testClient.read()
+	}()
+
+	mainWG.Wait()
+
+	assert.Nil(err)
+	fakeConn.AssertExpectations(t)
+}
