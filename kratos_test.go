@@ -137,7 +137,7 @@ func TestNew(t *testing.T) {
 	assert := assert.New(t)
 	testClient, err := testClientFactory.New()
 
-	assert.Equal("127.0.0.1", testClient.ServerDNS())
+	assert.Equal("127.0.0.1", testClient.Hostname())
 	assert.Nil(err)
 }
 

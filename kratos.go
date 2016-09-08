@@ -20,7 +20,7 @@ type ReadHandler interface {
 
 // Client is what function calls we expose to the user of kratos
 type Client interface {
-	ServerDNS() string
+	Hostname() string
 	Send(io.WriterTo) error
 	Close() error
 }
@@ -43,7 +43,7 @@ type client struct {
 	deviceId        string
 	userAgent       string
 	deviceProtocols string
-	serverDNS       string
+	hostname        string
 	handlers        []HandlerRegistry
 	connection      websocketConnection
 	headerInfo      *clientHeader
@@ -67,8 +67,8 @@ type ClientFactory struct {
 	Handlers       []HandlerRegistry
 }
 
-func (c *client) ServerDNS() string {
-	return c.serverDNS
+func (c *client) Hostname() string {
+	return c.hostname
 }
 
 // used to open a channel for writing to servers
@@ -119,7 +119,7 @@ func (f *ClientFactory) New() (Client, error) {
 		deviceId:        inHeader.deviceName,
 		userAgent:       "WebPA-1.6(" + inHeader.firmwareName + ";" + inHeader.modelName + "/" + inHeader.manufacturer + ";)",
 		deviceProtocols: "TODO-what-to-put-here",
-		serverDNS:       connectionURL,
+		hostname:        connectionURL,
 		handlers:        f.Handlers,
 		connection:      newConnection,
 		headerInfo:      inHeader,
