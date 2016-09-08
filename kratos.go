@@ -159,8 +159,6 @@ func (c *client) read() error {
 			}
 		}
 	}
-
-	return nil
 }
 
 // private func used to generate the client that we're looking to produce
