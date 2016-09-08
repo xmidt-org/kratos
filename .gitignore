@@ -1,4 +1,4 @@
 #output
 example/example
 *.out
-
+*.DS_Store

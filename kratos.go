@@ -20,6 +20,7 @@ type ReadHandler interface {
 
 // Client is what function calls we expose to the user of kratos
 type Client interface {
+	ServerDNS() string
 	Send(io.WriterTo) error
 	Close() error
 }
@@ -42,6 +43,7 @@ type client struct {
 	deviceId        string
 	userAgent       string
 	deviceProtocols string
+	serverDNS       string
 	handlers        []HandlerRegistry
 	connection      websocketConnection
 	headerInfo      *clientHeader
@@ -63,6 +65,10 @@ type ClientFactory struct {
 	Manufacturer   string
 	DestinationUrl string
 	Handlers       []HandlerRegistry
+}
+
+func (c *client) ServerDNS() string {
+	return c.serverDNS
 }
 
 // used to open a channel for writing to servers
@@ -100,15 +106,20 @@ func (f *ClientFactory) New() (Client, error) {
 		manufacturer: f.Manufacturer,
 	}
 
-	newConnection, err := createConnection(inHeader, f.DestinationUrl)
+	newConnection, connectionURL, err := createConnection(inHeader, f.DestinationUrl)
 	if err != nil {
 		return nil, err
 	}
+
+	// at this point we know that the URL connection is legitimate, so we can do some string manipulation
+	// with the knowledge that `:` will be found in the string twice
+	connectionURL = connectionURL[len("ws://"):strings.LastIndex(connectionURL, ":")]
 
 	newClient := &client{
 		deviceId:        inHeader.deviceName,
 		userAgent:       "WebPA-1.6(" + inHeader.firmwareName + ";" + inHeader.modelName + "/" + inHeader.manufacturer + ";)",
 		deviceProtocols: "TODO-what-to-put-here",
+		serverDNS:       connectionURL,
 		handlers:        f.Handlers,
 		connection:      newConnection,
 		headerInfo:      inHeader,
@@ -153,15 +164,15 @@ func (c *client) read() error {
 }
 
 // private func used to generate the client that we're looking to produce
-func createConnection(headerInfo *clientHeader, destUrl string) (*websocket.Conn, error) {
+func createConnection(headerInfo *clientHeader, destUrl string) (*websocket.Conn, string, error) {
 	_, err := canonical.ParseId(headerInfo.deviceName)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	url, err := resolveURL(headerInfo.deviceName, destUrl)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	// make a header and put some data in that (including MAC address)
@@ -175,10 +186,10 @@ func createConnection(headerInfo *clientHeader, destUrl string) (*websocket.Conn
 	// creates a new client connection given the URL string
 	connection, _, err := websocket.DefaultDialer.Dial(url.String(), headers)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	return connection, nil
+	return connection, url.String(), nil
 }
 
 // private func used to resolve the URL that we're given in case of redirects
