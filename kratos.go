@@ -78,7 +78,7 @@ func (c *client) Send(message io.WriterTo) error {
 		return err
 	}
 
-	err := c.connection.WriteMessage(websocket.TextMessage, buffer.Bytes())
+	err := c.connection.WriteMessage(websocket.BinaryMessage, buffer.Bytes())
 	if err != nil {
 		return err
 	}
