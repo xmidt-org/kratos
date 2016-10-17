@@ -189,7 +189,7 @@ func TestSend(t *testing.T) {
 	testClient := &client{}
 	testClient.connection = fakeConn
 
-	fakeConn.On("WriteMessage", 1, buffer.Bytes()).Return(nil).Once()
+	fakeConn.On("WriteMessage", websocket.BinaryMessage, buffer.Bytes()).Return(nil).Once()
 
 	fakeMsg.On(
 		"WriteTo",
@@ -215,7 +215,7 @@ func TestSendBrokenWriteMessage(t *testing.T) {
 	testClient := &client{}
 	testClient.connection = fakeConn
 
-	fakeConn.On("WriteMessage", 1, buffer.Bytes()).Return(ErrFoo).Once()
+	fakeConn.On("WriteMessage", websocket.BinaryMessage, buffer.Bytes()).Return(ErrFoo).Once()
 
 	fakeMsg.On(
 		"WriteTo",
