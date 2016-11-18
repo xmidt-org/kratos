@@ -8,6 +8,28 @@ Websocket wrapper that provides a simple API for making new connections,
 sending messages on that connection, and providing a way to handle received
 messages.
 
+## `Canticle` file that will fetch dependencies (steps outlined below):
+```
+[
+    {
+        "Root": "github.com/Comcast/webpa-common",
+        "Revision": "779f8a161755c8cc0008e62687344f3c0ab1d47c"
+    },
+    {
+        "Root": "github.com/gorilla/websocket",
+        "Revision": "e8f0f8aaa98dfb6586cbdf2978d511e3199a960a"
+    },
+    {
+        "Root": "github.com/nu7hatch/gouuid",
+        "Revision": "179d4d0c4d8d407a32af483c2354df1d2c91e6c3"
+    },
+    {
+        "Root": "github.com/ugorji/go",
+        "Revision": "faddd6128c66c4708f45fdc007f575f75e592a3c"
+    }
+]
+```
+
 ## Instructions for building sample `main.go` file:
 
 - make sure that you have golang installed and running (link: https://golang.org)
@@ -38,7 +60,7 @@ $ # copy the main.go file included in kratos into <root>/mytest/src/mytest
 $ cd <root>/mytest/src/mytest
 $ cp <root>/mytest/src/github.com/Comcast/kratos/example/main.go .
 $
-$ # copy the Canticle file provided into <root>/mytest/src
+$ # create a Canticle file (not demonstrated here) and copy it to <root>/mytest/src
 $ cp <path_to_Canticle_file>/Canticle <root>/mytest/src
 $
 $ # change directories to <root>/mytest/src and run `cant get -v`
