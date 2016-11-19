@@ -1,0 +1,16 @@
+package: github.com/Comcast/kratos
+import:
+- package: github.com/Comcast/webpa-common
+  version: 779f8a161755c8cc0008e62687344f3c0ab1d47c
+  subpackages:
+  - canonical
+  - wrp
+- package: github.com/gorilla/websocket
+  version: ~1.0.0
+- package: github.com/nu7hatch/gouuid
+testImport:
+- package: github.com/stretchr/testify
+  version: ~1.1.4
+  subpackages:
+  - assert
+  - mock
