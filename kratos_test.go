@@ -3,7 +3,7 @@ package kratos
 import (
 	"bytes"
 	"errors"
-	"github.com/comcast/webpa-common/wrp"
+	"github.com/Comcast/webpa-common/wrp"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
