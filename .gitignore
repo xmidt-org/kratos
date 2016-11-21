@@ -3,3 +3,6 @@ example/example
 vendor
 *.out
 *.DS_Store
+
+#config
+glide.lock
