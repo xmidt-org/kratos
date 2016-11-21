@@ -8,72 +8,57 @@ Websocket wrapper that provides a simple API for making new connections,
 sending messages on that connection, and providing a way to handle received
 messages.
 
-## `Canticle` file that will fetch dependencies (steps outlined below):
+## How to Install
+This project uses [glide](https://glide.sh) to manage its dependencies. To install, first download glide at the provided link, and then
+create a glide.yaml in `$GOPATH/src/myProject` (where myProject is the project that you're using `kratos` with). Running glide install
+with a properly formatted glide.yaml should pull down `kratos` and then all the dependencies that `kratos` has.
+
+## Sample `glide.yaml` to Build `kratos/example/main.go`
+Below is a sample `glide.yaml` that you can use in conjunction with the instructions (located further down in this README).
 ```
-[
-    {
-        "Root": "github.com/Comcast/webpa-common",
-        "Revision": "779f8a161755c8cc0008e62687344f3c0ab1d47c"
-    },
-    {
-        "Root": "github.com/gorilla/websocket",
-        "Revision": "e8f0f8aaa98dfb6586cbdf2978d511e3199a960a"
-    },
-    {
-        "Root": "github.com/nu7hatch/gouuid",
-        "Revision": "179d4d0c4d8d407a32af483c2354df1d2c91e6c3"
-    },
-    {
-        "Root": "github.com/ugorji/go",
-        "Revision": "faddd6128c66c4708f45fdc007f575f75e592a3c"
-    }
-]
+package: myProject
+import:
+- package: github.com/Comcast/kratos
 ```
 
 ## Instructions for building sample `main.go` file:
 
-- make sure that you have golang installed and running (link: https://golang.org)
-- make sure that you have Canticle installed (link: http://canticle.io)
-- if you don't have a `$GOBIN` path, make one and put the executable that comes with Canticle in it
-- ensure that your `$GOBIN` is included in your `$PATH`
+- make sure that you have [golang](https://golang.org) installed and running
+- make sure that you have [glide](https://glide.sh) installed
 - change directories in your computer to the directory that you want `kratos` to live in (henceforth called `<root>`)
-- we’ll call the “project” we’re creating to run the `kratos` sample file `mytest`
+- we’ll call the “project” we’re creating to run the `kratos` sample file `myProject`
 
 ```
-$ #create the directories for mytest from <root>
-$ mkdir -p mytest/src/mytest
+$ #create the directories for myProject from <root>
+$ mkdir -p myProject/src/myProject
 $
 $ # move in to the top level of the newly created directory and
 $ # set your $GOPATH to point there (this is for dependencies and such)
-$ cd <root>/mytest
+$ cd <root>/myProject
 $ export GOPATH=`pwd`
 $
-$ # change directories into the src directory and make the location for kratos
-$ cd <root>/mytest/src
-$ mkdir -p github.com/Comcast
+$ # put the provided glide.yaml file (shown above),
+$ # in the directory <root>/myProject/src/myProject
 $
-$ # change directories into the one you just created and clone kratos into it
-$ cd <root>/mytest/src/github.com/Comcast/
-$ git clone "https://github.com/comcast/kratos"
+$ # run `glide install` from <root>/myProject/src/myProject
+$ # (will only work if you put the `glide.yaml` file in this directory)
+$ glide install
 $
-$ # copy the main.go file included in kratos into <root>/mytest/src/mytest
-$ cd <root>/mytest/src/mytest
-$ cp <root>/mytest/src/github.com/Comcast/kratos/example/main.go .
+$ # copy the main.go file included in kratos into <root>/myProject/src/myProject
+$ cd <root>/myProject/src/myProject
+$ cp <root>/myProject/src/myProject/vendor/github.com/Comcast/kratos/example/main.go .
 $
-$ # create a Canticle file (not demonstrated here) and copy it to <root>/mytest/src
-$ cp <path_to_Canticle_file>/Canticle <root>/mytest/src
+$ # run `glide up` so we can grab the stuff that `main.go` says it needs
+$ # these weren't grabbed initially by glide since glide didn't have any import
+$ # statements to look at within code
+$ cd <root>/myProject/src/myProject
+$ glide up
 $
-$ # change directories to <root>/mytest/src and run `cant get -v`
-$ # (cant is the binary file included when installing Canticle and
-$ # must be somewhere in your $GOBIN, which you include in your $PATH)
-$ cd <root>/mytest/src
-$ cant get -v
-$
-$ # change directories to <root>/mytest/src/mytest and build mytest
-$ cd <root>/mytest/src/mytest
+$ # change directories to <root>/myProject/src/myProject and build myProject
+$ cd <root>/myProject/src/myProject
 $ go build
 $
 $ # run the example file
-$ ./mytest
+$ ./myProject
 ```
 
