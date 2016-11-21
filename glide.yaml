@@ -1,7 +1,7 @@
 package: github.com/Comcast/kratos
 import:
 - package: github.com/Comcast/webpa-common
-  version: b861f60ade721353a1a9a4af1d77852fe20a2ee4
+  version: 779f8a161755c8cc0008e62687344f3c0ab1d47c
   subpackages:
   - canonical
   - wrp
