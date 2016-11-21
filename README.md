@@ -9,9 +9,9 @@ sending messages on that connection, and providing a way to handle received
 messages.
 
 ## How to Install
-This project uses [glide](https://glide.sh) to manage its dependencies. To install, first download glide at the provided link, and then
-create a glide.yaml in `$GOPATH/src/myProject` (where myProject is the project that you're using `kratos` with). Running glide install
-with a properly formatted glide.yaml should pull down `kratos` and then all the dependencies that `kratos` has.
+This project uses [glide](https://glide.sh) to manage its dependencies. To install, first download `glide` at the provided link, and then
+create a `glide.yaml` in `$GOPATH/src/myProject` (where `myProject` is the project that you're using `kratos` with). Running `glide install`
+with a properly formatted `glide.yaml` should pull down `kratos` and then all the dependencies that `kratos` has.
 
 ## Sample `glide.yaml` to Build `kratos/example/main.go`
 Below is a sample `glide.yaml` that you can use in conjunction with the instructions (located further down in this README).
@@ -21,7 +21,7 @@ import:
 - package: github.com/Comcast/kratos
 ```
 
-## Instructions for building sample `main.go` file:
+## Instructions for Building Sample `main.go` File:
 
 - make sure that you have [golang](https://golang.org) installed and running
 - make sure that you have [glide](https://glide.sh) installed
