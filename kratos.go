@@ -200,6 +200,9 @@ func resolveURL(deviceId string, fabricUrl string) (*url.URL, error) {
 	if err != nil {
 		return nil, err
 	}
+	
+	//set keep alive to false
+	req.Close = true
 
 	// add the device name and MAC address to the http header
 	// TODO: do we need to populate the header with everything here, too?
