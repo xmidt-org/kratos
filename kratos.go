@@ -200,8 +200,8 @@ func resolveURL(deviceId string, fabricUrl string) (*url.URL, error) {
 	if err != nil {
 		return nil, err
 	}
-	
-	//set keep alive to false
+
+	// turn off keep alive
 	req.Close = true
 
 	// add the device name and MAC address to the http header
