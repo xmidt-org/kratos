@@ -2,6 +2,7 @@ package kratos
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/Comcast/webpa-common/canonical"
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/gorilla/websocket"
@@ -10,6 +11,15 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
+)
+
+const (
+	// Time allowed to write a message to the peer.
+	writeWait = time.Duration(10) * time.Second
+
+	// Time allowed to wait in between pings
+	pingWait = time.Duration(60) * time.Second
 )
 
 // ReadHandler should be implemented by the user so that they
@@ -23,6 +33,7 @@ type Client interface {
 	Hostname() string
 	Send(io.WriterTo) error
 	Close() error
+	checkPing(inTimer *time.Timer, pinged <-chan string)
 }
 
 type websocketConnection interface {
@@ -97,6 +108,21 @@ func (c *client) Close() error {
 	return nil
 }
 
+func (c *client) checkPing(inTimer *time.Timer, pinged <-chan string) {
+	for {
+		select {
+		case <-inTimer.C:
+			fmt.Println("Outta time!")
+		case <-pinged:
+			fmt.Println("Pinged!")
+			if !inTimer.Stop() {
+				<-inTimer.C
+			}
+			inTimer.Reset(pingWait)
+		}
+	}
+}
+
 // New is used to create a new kratos Client from a ClientFactory
 func (f *ClientFactory) New() (Client, error) {
 	inHeader := &clientHeader{
@@ -110,6 +136,13 @@ func (f *ClientFactory) New() (Client, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	pinged := make(chan string)
+	newConnection.SetPingHandler(func(appData string) error {
+		pinged <- appData
+		err := newConnection.WriteControl(websocket.PongMessage, []byte{}, time.Now().Add(writeWait))
+		return err
+	})
 
 	// at this point we know that the URL connection is legitimate, so we can do some string manipulation
 	// with the knowledge that `:` will be found in the string twice
@@ -132,6 +165,9 @@ func (f *ClientFactory) New() (Client, error) {
 		}
 	}
 
+	pingTimer := time.NewTimer(pingWait)
+
+	go newClient.checkPing(pingTimer, pinged)
 	go newClient.read()
 
 	return newClient, nil
