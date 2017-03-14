@@ -2,6 +2,7 @@ package kratos
 
 import (
 	"bytes"
+	"github.com/Comcast/webpa-common/canonical"
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/gorilla/websocket"
