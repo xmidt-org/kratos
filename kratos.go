@@ -58,6 +58,7 @@ type client struct {
 	handlers        []HandlerRegistry
 	connection      websocketConnection
 	headerInfo      *clientHeader
+	handlePingMiss  HandlePingMiss
 }
 
 // used to track everything that we want to know about the client headers
@@ -68,6 +69,10 @@ type clientHeader struct {
 	manufacturer string
 }
 
+// function called when we run into situations where we're not getting anymore pings
+// the implementation of this function needs to be handled by the user of kratos
+type HandlePingMiss func() error
+
 // ClientFactory is used to generate a client by calling new on this type
 type ClientFactory struct {
 	DeviceName     string
@@ -76,6 +81,7 @@ type ClientFactory struct {
 	Manufacturer   string
 	DestinationUrl string
 	Handlers       []HandlerRegistry
+	HandlePingMiss HandlePingMiss
 }
 
 func (c *client) Hostname() string {
@@ -113,6 +119,10 @@ func (c *client) checkPing(inTimer *time.Timer, pinged <-chan string) {
 		select {
 		case <-inTimer.C:
 			fmt.Println("Outta time!")
+			err := c.handlePingMiss()
+			if err != nil {
+				fmt.Println("Error handling ping miss:", err)
+			}
 		case <-pinged:
 			fmt.Println("Pinged!")
 			if !inTimer.Stop() {
@@ -156,6 +166,7 @@ func (f *ClientFactory) New() (Client, error) {
 		handlers:        f.Handlers,
 		connection:      newConnection,
 		headerInfo:      inHeader,
+		handlePingMiss:  f.HandlePingMiss,
 	}
 
 	for i := range newClient.handlers {
