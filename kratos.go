@@ -22,59 +22,6 @@ const (
 	pingWait = time.Duration(60) * time.Second
 )
 
-// ReadHandler should be implemented by the user so that they
-// may deal with received messages how they please
-type ReadHandler interface {
-	HandleMessage(msg interface{})
-}
-
-// Client is what function calls we expose to the user of kratos
-type Client interface {
-	Hostname() string
-	Send(io.WriterTo) error
-	Close() error
-}
-
-type websocketConnection interface {
-	WriteMessage(messageType int, data []byte) error
-	ReadMessage() (messageType int, p []byte, err error)
-	Close() error
-}
-
-// HandlerRegistry is an internal data type for Client interface
-// that helps keep track of registered handler functions
-type HandlerRegistry struct {
-	HandlerKey string
-	keyRegex   *regexp.Regexp
-	Handler    ReadHandler
-}
-
-// function called when we run into situations where we're not getting anymore pings
-// the implementation of this function needs to be handled by the user of kratos
-type HandlePingMiss func(inClient Client) error
-
-type PingMissHandler struct {
-	handlePingMiss HandlePingMiss
-}
-
-type client struct {
-	deviceId        string
-	userAgent       string
-	deviceProtocols string
-	hostname        string
-	handlers        []HandlerRegistry
-	connection      websocketConnection
-	headerInfo      *clientHeader
-}
-
-// used to track everything that we want to know about the client headers
-type clientHeader struct {
-	deviceName   string
-	firmwareName string
-	modelName    string
-	manufacturer string
-}
-
 // ClientFactory is used to generate a client by calling new on this type
 type ClientFactory struct {
 	DeviceName     string
@@ -84,55 +31,6 @@ type ClientFactory struct {
 	DestinationUrl string
 	Handlers       []HandlerRegistry
 	HandlePingMiss HandlePingMiss
-}
-
-func (pmh *PingMissHandler) checkPing(inTimer *time.Timer, pinged <-chan string, inClient Client) {
-	for {
-		select {
-		case <-inTimer.C:
-			fmt.Println("Outta time!")
-			err := pmh.handlePingMiss(inClient)
-			if err != nil {
-				fmt.Println("Error handling ping miss:", err)
-			}
-		case <-pinged:
-			fmt.Println("Pinged!")
-			if !inTimer.Stop() {
-				<-inTimer.C
-			}
-			inTimer.Reset(pingWait)
-		}
-	}
-}
-
-func (c *client) Hostname() string {
-	return c.hostname
-}
-
-// used to open a channel for writing to servers
-func (c *client) Send(message io.WriterTo) error {
-	var buffer bytes.Buffer
-	if _, err := message.WriteTo(&buffer); err != nil {
-		return err
-	}
-
-	err := c.connection.WriteMessage(websocket.BinaryMessage, buffer.Bytes())
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// will close the connection to the server
-// TODO: determine if I should have this somehow destroy the client
-// to prevent users from using it at all after call this
-func (c *client) Close() error {
-	if err := c.connection.Close(); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // New is used to create a new kratos Client from a ClientFactory
@@ -187,6 +85,108 @@ func (f *ClientFactory) New() (Client, error) {
 	go newClient.read()
 
 	return newClient, nil
+}
+
+// function called when we run into situations where we're not getting anymore pings
+// the implementation of this function needs to be handled by the user of kratos
+type HandlePingMiss func(inClient Client) error
+
+type PingMissHandler struct {
+	handlePingMiss HandlePingMiss
+}
+
+func (pmh *PingMissHandler) checkPing(inTimer *time.Timer, pinged <-chan string, inClient Client) {
+	for {
+		select {
+		case <-inTimer.C:
+			fmt.Println("Outta time!")
+			err := pmh.handlePingMiss(inClient)
+			if err != nil {
+				fmt.Println("Error handling ping miss:", err)
+			}
+		case <-pinged:
+			fmt.Println("Pinged!")
+			if !inTimer.Stop() {
+				<-inTimer.C
+			}
+			inTimer.Reset(pingWait)
+		}
+	}
+}
+
+// Client is what function calls we expose to the user of kratos
+type Client interface {
+	Hostname() string
+	Send(io.WriterTo) error
+	Close() error
+}
+
+type websocketConnection interface {
+	WriteMessage(messageType int, data []byte) error
+	ReadMessage() (messageType int, p []byte, err error)
+	Close() error
+}
+
+// ReadHandler should be implemented by the user so that they
+// may deal with received messages how they please
+type ReadHandler interface {
+	HandleMessage(msg interface{})
+}
+
+// HandlerRegistry is an internal data type for Client interface
+// that helps keep track of registered handler functions
+type HandlerRegistry struct {
+	HandlerKey string
+	keyRegex   *regexp.Regexp
+	Handler    ReadHandler
+}
+
+type client struct {
+	deviceId        string
+	userAgent       string
+	deviceProtocols string
+	hostname        string
+	handlers        []HandlerRegistry
+	connection      websocketConnection
+	headerInfo      *clientHeader
+}
+
+// used to track everything that we want to know about the client headers
+type clientHeader struct {
+	deviceName   string
+	firmwareName string
+	modelName    string
+	manufacturer string
+}
+
+func (c *client) Hostname() string {
+	return c.hostname
+}
+
+// used to open a channel for writing to servers
+func (c *client) Send(message io.WriterTo) error {
+	var buffer bytes.Buffer
+	if _, err := message.WriteTo(&buffer); err != nil {
+		return err
+	}
+
+	err := c.connection.WriteMessage(websocket.BinaryMessage, buffer.Bytes())
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// will close the connection to the server
+// TODO: determine if I should have this somehow destroy the client
+// to prevent users from using it at all after call this
+func (c *client) Close() error {
+	if err := c.connection.Close(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // going to be used to access the HandleMessage() function
