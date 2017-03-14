@@ -70,16 +70,16 @@ func (f *ClientFactory) New() (Client, error) {
 		headerInfo:      inHeader,
 	}
 
-	pingMissHandler := PingMissHandler{
+	myPingMissHandler := pingMissHandler{
 		handlePingMiss: f.HandlePingMiss,
 	}
 
 	if f.ClientLogger != nil {
 		newClient.Logger = f.ClientLogger
-		pingMissHandler.Logger = f.ClientLogger
+		myPingMissHandler.Logger = f.ClientLogger
 	} else {
 		newClient.Logger = &logging.LoggerWriter{ioutil.Discard}
-		pingMissHandler.Logger = &logging.LoggerWriter{ioutil.Discard}
+		myPingMissHandler.Logger = &logging.LoggerWriter{ioutil.Discard}
 	}
 
 	for i := range newClient.handlers {
@@ -91,7 +91,7 @@ func (f *ClientFactory) New() (Client, error) {
 
 	pingTimer := time.NewTimer(pingWait)
 
-	go pingMissHandler.checkPing(pingTimer, pinged, newClient)
+	go myPingMissHandler.checkPing(pingTimer, pinged, newClient)
 	go newClient.read()
 
 	return newClient, nil
@@ -101,12 +101,12 @@ func (f *ClientFactory) New() (Client, error) {
 // the implementation of this function needs to be handled by the user of kratos
 type HandlePingMiss func(inClient Client) error
 
-type PingMissHandler struct {
+type pingMissHandler struct {
 	handlePingMiss HandlePingMiss
 	logging.Logger
 }
 
-func (pmh *PingMissHandler) checkPing(inTimer *time.Timer, pinged <-chan string, inClient Client) {
+func (pmh *pingMissHandler) checkPing(inTimer *time.Timer, pinged <-chan string, inClient Client) {
 	for {
 		select {
 		case <-inTimer.C:
