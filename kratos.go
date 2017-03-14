@@ -231,6 +231,11 @@ func (c *client) read() error {
 
 // private func used to generate the client that we're looking to produce
 func createConnection(headerInfo *clientHeader, destUrl string) (*websocket.Conn, string, error) {
+	_, err := canonical.ParseId(headerInfo.deviceName)
+	if err != nil {
+		return nil, "", err
+	}
+
 	url, err := resolveURL(headerInfo.deviceName, destUrl)
 	if err != nil {
 		return nil, "", err
