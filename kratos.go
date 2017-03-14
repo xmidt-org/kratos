@@ -51,7 +51,7 @@ type HandlerRegistry struct {
 
 // function called when we run into situations where we're not getting anymore pings
 // the implementation of this function needs to be handled by the user of kratos
-type HandlePingMiss func() error
+type HandlePingMiss func(inClient Client) error
 
 type PingMissHandler struct {
 	handlePingMiss HandlePingMiss
@@ -64,7 +64,6 @@ type client struct {
 	hostname        string
 	handlers        []HandlerRegistry
 	connection      websocketConnection
-	pingMissHandler PingMissHandler
 	headerInfo      *clientHeader
 }
 
@@ -85,6 +84,25 @@ type ClientFactory struct {
 	DestinationUrl string
 	Handlers       []HandlerRegistry
 	HandlePingMiss HandlePingMiss
+}
+
+func (pmh *PingMissHandler) checkPing(inTimer *time.Timer, pinged <-chan string, inClient Client) {
+	for {
+		select {
+		case <-inTimer.C:
+			fmt.Println("Outta time!")
+			err := pmh.handlePingMiss(inClient)
+			if err != nil {
+				fmt.Println("Error handling ping miss:", err)
+			}
+		case <-pinged:
+			fmt.Println("Pinged!")
+			if !inTimer.Stop() {
+				<-inTimer.C
+			}
+			inTimer.Reset(pingWait)
+		}
+	}
 }
 
 func (c *client) Hostname() string {
@@ -115,25 +133,6 @@ func (c *client) Close() error {
 	}
 
 	return nil
-}
-
-func (pmh *PingMissHandler) checkPing(inTimer *time.Timer, pinged <-chan string) {
-	for {
-		select {
-		case <-inTimer.C:
-			fmt.Println("Outta time!")
-			err := pmh.handlePingMiss()
-			if err != nil {
-				fmt.Println("Error handling ping miss:", err)
-			}
-		case <-pinged:
-			fmt.Println("Pinged!")
-			if !inTimer.Stop() {
-				<-inTimer.C
-			}
-			inTimer.Reset(pingWait)
-		}
-	}
 }
 
 // New is used to create a new kratos Client from a ClientFactory
@@ -169,9 +168,6 @@ func (f *ClientFactory) New() (Client, error) {
 		handlers:        f.Handlers,
 		connection:      newConnection,
 		headerInfo:      inHeader,
-		pingMissHandler: PingMissHandler{
-			handlePingMiss: f.HandlePingMiss,
-		},
 	}
 
 	for i := range newClient.handlers {
@@ -181,9 +177,13 @@ func (f *ClientFactory) New() (Client, error) {
 		}
 	}
 
+	pingMissHandler := PingMissHandler{
+		handlePingMiss: f.HandlePingMiss,
+	}
+
 	pingTimer := time.NewTimer(pingWait)
 
-	go newClient.pingMissHandler.checkPing(pingTimer, pinged)
+	go pingMissHandler.checkPing(pingTimer, pinged, newClient)
 	go newClient.read()
 
 	return newClient, nil
