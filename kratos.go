@@ -2,11 +2,11 @@ package kratos
 
 import (
 	"bytes"
-	"fmt"
-	"github.com/Comcast/webpa-common/canonical"
+	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/gorilla/websocket"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -31,6 +31,7 @@ type ClientFactory struct {
 	DestinationUrl string
 	Handlers       []HandlerRegistry
 	HandlePingMiss HandlePingMiss
+	ClientLogger   logging.Logger
 }
 
 // New is used to create a new kratos Client from a ClientFactory
@@ -68,15 +69,23 @@ func (f *ClientFactory) New() (Client, error) {
 		headerInfo:      inHeader,
 	}
 
+	pingMissHandler := PingMissHandler{
+		handlePingMiss: f.HandlePingMiss,
+	}
+
+	if f.ClientLogger != nil {
+		newClient.Logger = f.ClientLogger
+		pingMissHandler.Logger = f.ClientLogger
+	} else {
+		newClient.Logger = &logging.LoggerWriter{ioutil.Discard}
+		pingMissHandler.Logger = &logging.LoggerWriter{ioutil.Discard}
+	}
+
 	for i := range newClient.handlers {
 		newClient.handlers[i].keyRegex, err = regexp.Compile(newClient.handlers[i].HandlerKey)
 		if err != nil {
 			return nil, err
 		}
-	}
-
-	pingMissHandler := PingMissHandler{
-		handlePingMiss: f.HandlePingMiss,
 	}
 
 	pingTimer := time.NewTimer(pingWait)
@@ -93,19 +102,19 @@ type HandlePingMiss func(inClient Client) error
 
 type PingMissHandler struct {
 	handlePingMiss HandlePingMiss
+	logging.Logger
 }
 
 func (pmh *PingMissHandler) checkPing(inTimer *time.Timer, pinged <-chan string, inClient Client) {
 	for {
 		select {
 		case <-inTimer.C:
-			fmt.Println("Outta time!")
+			pmh.Info("Ping miss!")
 			err := pmh.handlePingMiss(inClient)
 			if err != nil {
-				fmt.Println("Error handling ping miss:", err)
+				pmh.Info("Error handling ping miss:", err)
 			}
 		case <-pinged:
-			fmt.Println("Pinged!")
 			if !inTimer.Stop() {
 				<-inTimer.C
 			}
@@ -149,6 +158,7 @@ type client struct {
 	handlers        []HandlerRegistry
 	connection      websocketConnection
 	headerInfo      *clientHeader
+	logging.Logger
 }
 
 // used to track everything that we want to know about the client headers
@@ -165,6 +175,8 @@ func (c *client) Hostname() string {
 
 // used to open a channel for writing to servers
 func (c *client) Send(message io.WriterTo) error {
+	c.Info("Sending message...")
+
 	var buffer bytes.Buffer
 	if _, err := message.WriteTo(&buffer); err != nil {
 		return err
@@ -182,6 +194,8 @@ func (c *client) Send(message io.WriterTo) error {
 // TODO: determine if I should have this somehow destroy the client
 // to prevent users from using it at all after call this
 func (c *client) Close() error {
+	c.Info("Closing client...")
+
 	if err := c.connection.Close(); err != nil {
 		return err
 	}
@@ -191,6 +205,8 @@ func (c *client) Close() error {
 
 // going to be used to access the HandleMessage() function
 func (c *client) read() error {
+	c.Info("Reading message...")
+
 	for {
 		_, serverMessage, err := c.connection.ReadMessage()
 		if err != nil {
@@ -215,11 +231,6 @@ func (c *client) read() error {
 
 // private func used to generate the client that we're looking to produce
 func createConnection(headerInfo *clientHeader, destUrl string) (*websocket.Conn, string, error) {
-	_, err := canonical.ParseId(headerInfo.deviceName)
-	if err != nil {
-		return nil, "", err
-	}
-
 	url, err := resolveURL(headerInfo.deviceName, destUrl)
 	if err != nil {
 		return nil, "", err
