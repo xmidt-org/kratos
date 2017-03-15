@@ -107,10 +107,13 @@ type pingMissHandler struct {
 }
 
 func (pmh *pingMissHandler) checkPing(inTimer *time.Timer, pinged <-chan string, inClient Client) {
+	pingMiss := false
+
 	for {
 		select {
 		case <-inTimer.C:
 			pmh.Info("Ping miss, calling handler and closing client!")
+			pingMiss = true
 			err := pmh.handlePingMiss()
 			if err != nil {
 				pmh.Info("Error handling ping miss:", err)
@@ -124,6 +127,10 @@ func (pmh *pingMissHandler) checkPing(inTimer *time.Timer, pinged <-chan string,
 				<-inTimer.C
 			}
 			inTimer.Reset(pingWait)
+		}
+
+		if pingMiss {
+			break
 		}
 	}
 }
