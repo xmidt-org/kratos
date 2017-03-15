@@ -99,7 +99,7 @@ func (f *ClientFactory) New() (Client, error) {
 
 // function called when we run into situations where we're not getting anymore pings
 // the implementation of this function needs to be handled by the user of kratos
-type HandlePingMiss func(inClient Client) error
+type HandlePingMiss func() error
 
 type pingMissHandler struct {
 	handlePingMiss HandlePingMiss
@@ -110,10 +110,14 @@ func (pmh *pingMissHandler) checkPing(inTimer *time.Timer, pinged <-chan string,
 	for {
 		select {
 		case <-inTimer.C:
-			pmh.Info("Ping miss!")
-			err := pmh.handlePingMiss(inClient)
+			pmh.Info("Ping miss, calling handler and closing client!")
+			err := pmh.handlePingMiss()
 			if err != nil {
 				pmh.Info("Error handling ping miss:", err)
+			}
+			err = inClient.Close()
+			if err != nil {
+				pmh.Info("Error closing client:", err)
 			}
 		case <-pinged:
 			if !inTimer.Stop() {

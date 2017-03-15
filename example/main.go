@@ -60,7 +60,7 @@ func main() {
 				},
 			},
 		},
-		HandlePingMiss: func(inClient kratos.Client) error {
+		HandlePingMiss: func() error {
 			fmt.Println("We missed the ping!")
 			return nil
 		},
