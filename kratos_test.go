@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"sync"
 	"testing"
+	"time"
 )
 
 const (
@@ -73,6 +74,25 @@ var (
 )
 
 /****************** BEGIN MOCK DECLARATIONS ***********************/
+type mockClient struct {
+	mock.Mock
+}
+
+func (m *mockClient) Hostname() string {
+	arguments := m.Called()
+	return arguments.String(0)
+}
+
+func (m *mockClient) Send(message io.WriterTo) error {
+	arguments := m.Called(message)
+	return arguments.Error(0)
+}
+
+func (m *mockClient) Close() error {
+	arguments := m.Called()
+	return arguments.Error(0)
+}
+
 type mockConnection struct {
 	mock.Mock
 }
@@ -176,6 +196,30 @@ func TestBadHandshake(t *testing.T) {
 	testClientFactory.DestinationUrl = testServer.URL
 
 	assert.NotNil(err)
+}
+
+func TestCheckPingTimeout(t *testing.T) {
+	assert := assert.New(t)
+	timesCalled := 0
+
+	fakeClient := &mockClient{}
+	fakeClient.On("Close").Return(nil).Once()
+
+	testPingMissHandler := pingMissHandler{
+		handlePingMiss: func() error {
+			timesCalled++
+			return nil
+		},
+		Logger: &logging.LoggerWriter{os.Stdout},
+	}
+
+	pingTimer := time.NewTimer(time.Duration(1) * time.Second)
+	pinged := make(chan string)
+
+	testPingMissHandler.checkPing(pingTimer, pinged, fakeClient)
+
+	assert.Equal(1, timesCalled)
+	fakeClient.AssertExpectations(t)
 }
 
 // test the happy-path of sending a message through a websocket
