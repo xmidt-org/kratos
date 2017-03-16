@@ -52,7 +52,7 @@ func (f *ClientFactory) New() (Client, error) {
 	pinged := make(chan string)
 	newConnection.SetPingHandler(func(appData string) error {
 		pinged <- appData
-		err := newConnection.WriteControl(websocket.PongMessage, []byte{}, time.Now().Add(writeWait))
+		err := newConnection.WriteControl(websocket.PongMessage, []byte(appData), time.Now().Add(writeWait))
 		return err
 	})
 
