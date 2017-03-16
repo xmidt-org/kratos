@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -196,7 +195,7 @@ func TestSend(t *testing.T) {
 
 	testClient := &client{
 		connection: fakeConn,
-		Logger:     &logging.LoggerWriter{ioutil.Discard},
+		Logger:     &logging.LoggerWriter{os.Stdout},
 	}
 
 	err := testClient.Send(fakeMsg)
@@ -223,7 +222,7 @@ func TestSendBrokenWriteMessage(t *testing.T) {
 
 	testClient := &client{
 		connection: fakeConn,
-		Logger:     &logging.LoggerWriter{ioutil.Discard},
+		Logger:     &logging.LoggerWriter{os.Stdout},
 	}
 
 	err := testClient.Send(fakeMsg)
@@ -245,7 +244,7 @@ func TestSendBrokenWriter(t *testing.T) {
 	).Return(int64(expectedByteCount), ErrFoo).Once()
 
 	testClient := &client{
-		Logger: &logging.LoggerWriter{ioutil.Discard},
+		Logger: &logging.LoggerWriter{os.Stdout},
 	}
 
 	err := testClient.Send(fakeMsg)
@@ -263,7 +262,7 @@ func TestClose(t *testing.T) {
 
 	testClient := &client{
 		connection: fakeConn,
-		Logger:     &logging.LoggerWriter{ioutil.Discard},
+		Logger:     &logging.LoggerWriter{os.Stdout},
 	}
 
 	err := testClient.Close()
@@ -281,7 +280,7 @@ func TestCloseBroken(t *testing.T) {
 
 	testClient := &client{
 		connection: fakeConn,
-		Logger:     &logging.LoggerWriter{ioutil.Discard},
+		Logger:     &logging.LoggerWriter{os.Stdout},
 	}
 
 	err := testClient.Close()
@@ -315,7 +314,7 @@ func TestRead(t *testing.T) {
 		},
 		connection: fakeConn,
 		headerInfo: nil,
-		Logger:     &logging.LoggerWriter{ioutil.Discard},
+		Logger:     &logging.LoggerWriter{os.Stdout},
 	}
 
 	testClient.handlers[0].keyRegex, _ = regexp.Compile(testClient.handlers[0].HandlerKey)
