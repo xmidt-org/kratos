@@ -107,6 +107,7 @@ type pingMissHandler struct {
 }
 
 func (pmh *pingMissHandler) checkPing(inTimer *time.Timer, pinged <-chan string, inClient Client) {
+	defer inClient.Close()
 	pingMiss := false
 
 	for !pingMiss {
@@ -117,10 +118,6 @@ func (pmh *pingMissHandler) checkPing(inTimer *time.Timer, pinged <-chan string,
 			err := pmh.handlePingMiss()
 			if err != nil {
 				pmh.Info("Error handling ping miss:", err)
-			}
-			err = inClient.Close()
-			if err != nil {
-				pmh.Info("Error closing client:", err)
 			}
 		case <-pinged:
 			if !inTimer.Stop() {
