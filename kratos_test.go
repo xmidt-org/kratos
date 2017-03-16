@@ -3,11 +3,13 @@ package kratos
 import (
 	"bytes"
 	"errors"
+	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -184,17 +186,18 @@ func TestSend(t *testing.T) {
 	var buffer bytes.Buffer
 
 	fakeConn := &mockConnection{}
-	fakeMsg := &mockMessage{}
-
-	testClient := &client{}
-	testClient.connection = fakeConn
-
 	fakeConn.On("WriteMessage", websocket.BinaryMessage, buffer.Bytes()).Return(nil).Once()
 
+	fakeMsg := &mockMessage{}
 	fakeMsg.On(
 		"WriteTo",
 		mock.MatchedBy(func(io.Writer) bool { return true }),
 	).Return(int64(expectedByteCount), nil).Once()
+
+	testClient := &client{
+		connection: fakeConn,
+		Logger:     &logging.LoggerWriter{ioutil.Discard},
+	}
 
 	err := testClient.Send(fakeMsg)
 
@@ -210,17 +213,18 @@ func TestSendBrokenWriteMessage(t *testing.T) {
 	var buffer bytes.Buffer
 
 	fakeConn := &mockConnection{}
-	fakeMsg := &mockMessage{}
-
-	testClient := &client{}
-	testClient.connection = fakeConn
-
 	fakeConn.On("WriteMessage", websocket.BinaryMessage, buffer.Bytes()).Return(ErrFoo).Once()
 
+	fakeMsg := &mockMessage{}
 	fakeMsg.On(
 		"WriteTo",
 		mock.MatchedBy(func(io.Writer) bool { return true }),
 	).Return(int64(expectedByteCount), nil).Once()
+
+	testClient := &client{
+		connection: fakeConn,
+		Logger:     &logging.LoggerWriter{ioutil.Discard},
+	}
 
 	err := testClient.Send(fakeMsg)
 
@@ -235,13 +239,14 @@ func TestSendBrokenWriter(t *testing.T) {
 	const expectedByteCount = 42
 
 	fakeMsg := &mockMessage{}
-
-	testClient := &client{}
-
 	fakeMsg.On(
 		"WriteTo",
 		mock.MatchedBy(func(io.Writer) bool { return true }),
 	).Return(int64(expectedByteCount), ErrFoo).Once()
+
+	testClient := &client{
+		Logger: &logging.LoggerWriter{ioutil.Discard},
+	}
 
 	err := testClient.Send(fakeMsg)
 
@@ -249,16 +254,17 @@ func TestSendBrokenWriter(t *testing.T) {
 	fakeMsg.AssertExpectations(t)
 }
 
-// test closing a websocket once we're finished using it
+// test the happy path of closing a websocket once we're finished using it
 func TestClose(t *testing.T) {
 	assert := assert.New(t)
+
 	fakeConn := &mockConnection{}
-
-	testClient := &client{}
-	testClient.connection = fakeConn
-
-	// test the happy path of closing the websocket
 	fakeConn.On("Close").Return(nil).Once()
+
+	testClient := &client{
+		connection: fakeConn,
+		Logger:     &logging.LoggerWriter{ioutil.Discard},
+	}
 
 	err := testClient.Close()
 
@@ -271,10 +277,12 @@ func TestCloseBroken(t *testing.T) {
 	assert := assert.New(t)
 	fakeConn := &mockConnection{}
 
-	testClient := &client{}
-	testClient.connection = fakeConn
-
 	fakeConn.On("Close").Return(ErrFoo).Once()
+
+	testClient := &client{
+		connection: fakeConn,
+		Logger:     &logging.LoggerWriter{ioutil.Discard},
+	}
 
 	err := testClient.Close()
 
@@ -287,7 +295,9 @@ func TestCloseBroken(t *testing.T) {
 // they simply provide a handler and let a go routine deal with this call
 func TestRead(t *testing.T) {
 	assert := assert.New(t)
+
 	fakeConn := &mockConnection{}
+	fakeConn.On("ReadMessage").Return(0, goodMsg, nil)
 
 	testClient := &client{
 		deviceId:        testClientFactory.DeviceName,
@@ -305,11 +315,10 @@ func TestRead(t *testing.T) {
 		},
 		connection: fakeConn,
 		headerInfo: nil,
+		Logger:     &logging.LoggerWriter{ioutil.Discard},
 	}
 
 	testClient.handlers[0].keyRegex, _ = regexp.Compile(testClient.handlers[0].HandlerKey)
-
-	fakeConn.On("ReadMessage").Return(0, goodMsg, nil)
 
 	mainWG.Add(1)
 	var err error
