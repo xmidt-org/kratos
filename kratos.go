@@ -109,7 +109,7 @@ type pingMissHandler struct {
 func (pmh *pingMissHandler) checkPing(inTimer *time.Timer, pinged <-chan string, inClient Client) {
 	pingMiss := false
 
-	for {
+	for !pingMiss {
 		select {
 		case <-inTimer.C:
 			pmh.Info("Ping miss, calling handler and closing client!")
@@ -127,10 +127,6 @@ func (pmh *pingMissHandler) checkPing(inTimer *time.Timer, pinged <-chan string,
 				<-inTimer.C
 			}
 			inTimer.Reset(pingWait)
-		}
-
-		if pingMiss {
-			break
 		}
 	}
 }
@@ -186,49 +182,42 @@ func (c *client) Hostname() string {
 }
 
 // used to open a channel for writing to servers
-func (c *client) Send(message io.WriterTo) error {
+func (c *client) Send(message io.WriterTo) (err error) {
 	c.Info("Sending message...")
 
 	var buffer bytes.Buffer
-	if _, err := message.WriteTo(&buffer); err != nil {
-		return err
+	if _, err = message.WriteTo(&buffer); err != nil {
+		return
 	}
 
-	err := c.connection.WriteMessage(websocket.BinaryMessage, buffer.Bytes())
-	if err != nil {
-		return err
-	}
-
-	return nil
+	err = c.connection.WriteMessage(websocket.BinaryMessage, buffer.Bytes())
+	return
 }
 
 // will close the connection to the server
-// TODO: determine if I should have this somehow destroy the client
-// to prevent users from using it at all after call this
-func (c *client) Close() error {
+func (c *client) Close() (err error) {
 	c.Info("Closing client...")
 
-	if err := c.connection.Close(); err != nil {
-		return err
-	}
-
-	return nil
+	err = c.connection.Close()
+	return
 }
 
 // going to be used to access the HandleMessage() function
-func (c *client) read() error {
+func (c *client) read() (err error) {
 	c.Info("Reading message...")
 
 	for {
-		_, serverMessage, err := c.connection.ReadMessage()
+		var serverMessage []byte
+		_, serverMessage, err = c.connection.ReadMessage()
 		if err != nil {
-			return err
+			return
 		}
 
 		// decode the message so we can read it
-		data, err := wrp.Decode(serverMessage)
+		var data interface{}
+		data, err = wrp.Decode(serverMessage)
 		if err != nil {
-			return err
+			return
 		}
 
 		if _, ok := data.(wrp.WrpMsg); ok {
@@ -239,6 +228,8 @@ func (c *client) read() error {
 			}
 		}
 	}
+
+	return
 }
 
 // private func used to generate the client that we're looking to produce
