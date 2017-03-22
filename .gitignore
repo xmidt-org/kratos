@@ -2,7 +2,6 @@
 example/example
 vendor
 *.out
+*.swp
 *.DS_Store
 
-#config
-glide.lock

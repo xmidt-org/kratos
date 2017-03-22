@@ -1,0 +1,35 @@
+hash: a656d55eeaba94c28a3331005723e02ccacd085b11b8dbb4bcc2c9db3040e175
+updated: 2017-03-14T15:33:40.431696522-07:00
+imports:
+- name: github.com/Comcast/kratos
+  version: 188b6f0f34a4d8a8cd58a93bca01b38f2df2584f
+- name: github.com/Comcast/webpa-common
+  version: 779f8a161755c8cc0008e62687344f3c0ab1d47c
+  subpackages:
+  - canonical
+  - wrp
+  - logging
+- name: github.com/gorilla/websocket
+  version: e8f0f8aaa98dfb6586cbdf2978d511e3199a960a
+- name: github.com/nu7hatch/gouuid
+  version: 179d4d0c4d8d407a32af483c2354df1d2c91e6c3
+- name: github.com/ugorji/go
+  version: faddd6128c66c4708f45fdc007f575f75e592a3c
+  subpackages:
+  - codec
+testImports:
+- name: github.com/davecgh/go-spew
+  version: 04cdfd42973bb9c8589fd6a731800cf222fde1a9
+  subpackages:
+  - spew
+- name: github.com/pmezard/go-difflib
+  version: d8ed2627bdf02c080bf22230dbb337003b7aba2d
+  subpackages:
+  - difflib
+- name: github.com/stretchr/objx
+  version: cbeaeb16a013161a98496fad62933b1d21786672
+- name: github.com/stretchr/testify
+  version: 18a02ba4a312f95da08ff4cfc0055750ce50ae9e
+  subpackages:
+  - assert
+  - mock

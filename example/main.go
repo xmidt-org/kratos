@@ -3,8 +3,10 @@ package main
 import (
 	"fmt"
 	"github.com/Comcast/kratos"
+	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/nu7hatch/gouuid"
+	"os"
 	"sync"
 )
 
@@ -58,6 +60,11 @@ func main() {
 				},
 			},
 		},
+		HandlePingMiss: func() error {
+			fmt.Println("We missed the ping!")
+			return nil
+		},
+		ClientLogger: &logging.LoggerWriter{os.Stdout},
 	}).New()
 	if err != nil {
 		fmt.Println("Error making client: ", err)

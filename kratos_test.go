@@ -3,6 +3,7 @@ package kratos
 import (
 	"bytes"
 	"errors"
+	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/wrp"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
@@ -14,6 +15,7 @@ import (
 	"regexp"
 	"sync"
 	"testing"
+	"time"
 )
 
 const (
@@ -72,6 +74,25 @@ var (
 )
 
 /****************** BEGIN MOCK DECLARATIONS ***********************/
+type mockClient struct {
+	mock.Mock
+}
+
+func (m *mockClient) Hostname() string {
+	arguments := m.Called()
+	return arguments.String(0)
+}
+
+func (m *mockClient) Send(message io.WriterTo) error {
+	arguments := m.Called(message)
+	return arguments.Error(0)
+}
+
+func (m *mockClient) Close() error {
+	arguments := m.Called()
+	return arguments.Error(0)
+}
+
 type mockConnection struct {
 	mock.Mock
 }
@@ -177,6 +198,30 @@ func TestBadHandshake(t *testing.T) {
 	assert.NotNil(err)
 }
 
+func TestCheckPingTimeout(t *testing.T) {
+	assert := assert.New(t)
+	timesCalled := 0
+
+	fakeClient := &mockClient{}
+	fakeClient.On("Close").Return(nil).Once()
+
+	testPingMissHandler := pingMissHandler{
+		handlePingMiss: func() error {
+			timesCalled++
+			return nil
+		},
+		Logger: &logging.LoggerWriter{os.Stdout},
+	}
+
+	pingTimer := time.NewTimer(time.Duration(1) * time.Second)
+	pinged := make(chan string)
+
+	testPingMissHandler.checkPing(pingTimer, pinged, fakeClient)
+
+	assert.Equal(1, timesCalled)
+	fakeClient.AssertExpectations(t)
+}
+
 // test the happy-path of sending a message through a websocket
 func TestSend(t *testing.T) {
 	assert := assert.New(t)
@@ -184,17 +229,18 @@ func TestSend(t *testing.T) {
 	var buffer bytes.Buffer
 
 	fakeConn := &mockConnection{}
-	fakeMsg := &mockMessage{}
-
-	testClient := &client{}
-	testClient.connection = fakeConn
-
 	fakeConn.On("WriteMessage", websocket.BinaryMessage, buffer.Bytes()).Return(nil).Once()
 
+	fakeMsg := &mockMessage{}
 	fakeMsg.On(
 		"WriteTo",
 		mock.MatchedBy(func(io.Writer) bool { return true }),
 	).Return(int64(expectedByteCount), nil).Once()
+
+	testClient := &client{
+		connection: fakeConn,
+		Logger:     &logging.LoggerWriter{os.Stdout},
+	}
 
 	err := testClient.Send(fakeMsg)
 
@@ -210,17 +256,18 @@ func TestSendBrokenWriteMessage(t *testing.T) {
 	var buffer bytes.Buffer
 
 	fakeConn := &mockConnection{}
-	fakeMsg := &mockMessage{}
-
-	testClient := &client{}
-	testClient.connection = fakeConn
-
 	fakeConn.On("WriteMessage", websocket.BinaryMessage, buffer.Bytes()).Return(ErrFoo).Once()
 
+	fakeMsg := &mockMessage{}
 	fakeMsg.On(
 		"WriteTo",
 		mock.MatchedBy(func(io.Writer) bool { return true }),
 	).Return(int64(expectedByteCount), nil).Once()
+
+	testClient := &client{
+		connection: fakeConn,
+		Logger:     &logging.LoggerWriter{os.Stdout},
+	}
 
 	err := testClient.Send(fakeMsg)
 
@@ -235,13 +282,14 @@ func TestSendBrokenWriter(t *testing.T) {
 	const expectedByteCount = 42
 
 	fakeMsg := &mockMessage{}
-
-	testClient := &client{}
-
 	fakeMsg.On(
 		"WriteTo",
 		mock.MatchedBy(func(io.Writer) bool { return true }),
 	).Return(int64(expectedByteCount), ErrFoo).Once()
+
+	testClient := &client{
+		Logger: &logging.LoggerWriter{os.Stdout},
+	}
 
 	err := testClient.Send(fakeMsg)
 
@@ -249,16 +297,17 @@ func TestSendBrokenWriter(t *testing.T) {
 	fakeMsg.AssertExpectations(t)
 }
 
-// test closing a websocket once we're finished using it
+// test the happy path of closing a websocket once we're finished using it
 func TestClose(t *testing.T) {
 	assert := assert.New(t)
+
 	fakeConn := &mockConnection{}
-
-	testClient := &client{}
-	testClient.connection = fakeConn
-
-	// test the happy path of closing the websocket
 	fakeConn.On("Close").Return(nil).Once()
+
+	testClient := &client{
+		connection: fakeConn,
+		Logger:     &logging.LoggerWriter{os.Stdout},
+	}
 
 	err := testClient.Close()
 
@@ -271,10 +320,12 @@ func TestCloseBroken(t *testing.T) {
 	assert := assert.New(t)
 	fakeConn := &mockConnection{}
 
-	testClient := &client{}
-	testClient.connection = fakeConn
-
 	fakeConn.On("Close").Return(ErrFoo).Once()
+
+	testClient := &client{
+		connection: fakeConn,
+		Logger:     &logging.LoggerWriter{os.Stdout},
+	}
 
 	err := testClient.Close()
 
@@ -287,7 +338,9 @@ func TestCloseBroken(t *testing.T) {
 // they simply provide a handler and let a go routine deal with this call
 func TestRead(t *testing.T) {
 	assert := assert.New(t)
+
 	fakeConn := &mockConnection{}
+	fakeConn.On("ReadMessage").Return(0, goodMsg, nil)
 
 	testClient := &client{
 		deviceId:        testClientFactory.DeviceName,
@@ -305,11 +358,10 @@ func TestRead(t *testing.T) {
 		},
 		connection: fakeConn,
 		headerInfo: nil,
+		Logger:     &logging.LoggerWriter{os.Stdout},
 	}
 
 	testClient.handlers[0].keyRegex, _ = regexp.Compile(testClient.handlers[0].HandlerKey)
-
-	fakeConn.On("ReadMessage").Return(0, goodMsg, nil)
 
 	mainWG.Add(1)
 	var err error

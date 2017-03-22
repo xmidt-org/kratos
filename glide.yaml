@@ -5,6 +5,7 @@ import:
   subpackages:
   - canonical
   - wrp
+  - logging
 - package: github.com/gorilla/websocket
   version: e8f0f8aaa98dfb6586cbdf2978d511e3199a960a
 - package: github.com/nu7hatch/gouuid
