@@ -9,7 +9,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -45,6 +44,7 @@ func (f *ClientFactory) New() (Client, error) {
 	}
 
 	newConnection, connectionURL, err := createConnection(inHeader, f.DestinationUrl)
+
 	if err != nil {
 		return nil, err
 	}
@@ -236,11 +236,6 @@ func createConnection(headerInfo *clientHeader, destUrl string) (*websocket.Conn
 		return nil, "", err
 	}
 
-	url, err := resolveURL(headerInfo.deviceName, destUrl)
-	if err != nil {
-		return nil, "", err
-	}
-
 	// make a header and put some data in that (including MAC address)
 	// TODO: find special function for user agent
 	headers := make(http.Header)
@@ -249,44 +244,23 @@ func createConnection(headerInfo *clientHeader, destUrl string) (*websocket.Conn
 	headers.Add("X-Webpa-Model-Name", headerInfo.modelName)
 	headers.Add("X-Webpa-Manufacturer", headerInfo.manufacturer)
 
+	//make sure destUrl's protocol is websocket (ws)
+	destUrl = strings.Replace(destUrl, "http", "ws", 1)
+
 	// creates a new client connection given the URL string
-	connection, _, err := websocket.DefaultDialer.Dial(url.String(), headers)
+	connection, resp , err := websocket.DefaultDialer.Dial(destUrl, headers)
+
+	if err == websocket.ErrBadHandshake && resp.StatusCode == http.StatusTemporaryRedirect {
+		//Get url to which we are redirected and reconfigure it
+		destUrl = strings.Replace(resp.Header.Get("Location"), "http", "ws", 1)
+
+		connection, _, err = websocket.DefaultDialer.Dial(destUrl, headers)
+	}
+
 	if err != nil {
 		return nil, "", err
 	}
 
-	return connection, url.String(), nil
+	return connection, destUrl ,nil
 }
 
-// private func used to resolve the URL that we're given in case of redirects
-func resolveURL(deviceId string, fabricUrl string) (*url.URL, error) {
-	// declare client as a pointer to a new http client struct
-	client := &http.Client{}
-
-	// get a Request suitable for use with Client.Do
-	req, err := http.NewRequest("GET", fabricUrl, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	// turn off keep alive
-	req.Close = true
-
-	// add the device name and MAC address to the http header
-	// TODO: do we need to populate the header with everything here, too?
-	req.Header.Add("X-Webpa-Device-Name", deviceId)
-
-	// send an http request and receive a response from the server
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	// replace the `https` in the URL with `wss`
-	actualURL, err := url.Parse(strings.Replace(resp.Request.URL.String(), "http", "ws", 1))
-	if err != nil {
-		return nil, err
-	}
-
-	return actualURL, nil
-}
