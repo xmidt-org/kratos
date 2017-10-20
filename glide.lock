@@ -1,5 +1,5 @@
-hash: 55240a60f643bf2bb84ca06487aeb203f14dbd999f152a04aba4d7c73f98da05
-updated: 2017-10-20T10:29:37.470110512-07:00
+hash: ac3bd7d5b593237ff22bc0148e77f9b63bbd00ce71fd76781bef7749fd419b93
+updated: 2017-10-20T11:20:56.003999683-07:00
 imports:
 - name: github.com/Comcast/webpa-common
   version: 9d9218c77174931468a8f41f223550e6709215b6
@@ -42,8 +42,6 @@ imports:
   version: 8d7837e64d3c1ee4e54a880c5a920ab4316fc90a
 - name: github.com/mitchellh/mapstructure
   version: d0303fe809921458f417bcf828397a65db30a7e4
-- name: github.com/nu7hatch/gouuid
-  version: 179d4d0c4d8d407a32af483c2354df1d2c91e6c3
 - name: github.com/pelletier/go-toml
   version: 2009e44b6f182e34d8ce081ac2767622937ea3d4
 - name: github.com/spf13/afero
