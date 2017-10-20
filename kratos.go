@@ -28,7 +28,7 @@ type ClientFactory struct {
 	FirmwareName   string
 	ModelName      string
 	Manufacturer   string
-	DestinationUrl string
+	DestinationURL string
 	Handlers       []HandlerRegistry
 	HandlePingMiss HandlePingMiss
 	ClientLogger   log.Logger
@@ -43,7 +43,7 @@ func (f *ClientFactory) New() (Client, error) {
 		manufacturer: f.Manufacturer,
 	}
 
-	newConnection, connectionURL, err := createConnection(inHeader, f.DestinationUrl)
+	newConnection, connectionURL, err := createConnection(inHeader, f.DestinationURL)
 
 	if err != nil {
 		return nil, err
@@ -61,7 +61,7 @@ func (f *ClientFactory) New() (Client, error) {
 	connectionURL = connectionURL[len("ws://"):strings.LastIndex(connectionURL, ":")]
 
 	newClient := &client{
-		deviceId:        inHeader.deviceName,
+		deviceID:        inHeader.deviceName,
 		userAgent:       "WebPA-1.6(" + inHeader.firmwareName + ";" + inHeader.modelName + "/" + inHeader.manufacturer + ";)",
 		deviceProtocols: "TODO-what-to-put-here",
 		hostname:        connectionURL,
@@ -97,7 +97,7 @@ func (f *ClientFactory) New() (Client, error) {
 	return newClient, nil
 }
 
-// function called when we run into situations where we're not getting anymore pings
+// HandlePingMiss is a function called when we run into situations where we're not getting anymore pings
 // the implementation of this function needs to be handled by the user of kratos
 type HandlePingMiss func() error
 
@@ -156,7 +156,7 @@ type HandlerRegistry struct {
 }
 
 type client struct {
-	deviceId        string
+	deviceID        string
 	userAgent       string
 	deviceProtocols string
 	hostname        string
@@ -228,8 +228,9 @@ func (c *client) read() (err error) {
 }
 
 // private func used to generate the client that we're looking to produce
-func createConnection(headerInfo *clientHeader, destUrl string) (*websocket.Conn, string, error) {
-	_, err := device.ParseID(headerInfo.deviceName)
+func createConnection(headerInfo *clientHeader, httpURL string) (connection *websocket.Conn, wsURL string, err error) {
+	_, err = device.ParseID(headerInfo.deviceName)
+
 	if err != nil {
 		return nil, "", err
 	}
@@ -243,21 +244,21 @@ func createConnection(headerInfo *clientHeader, destUrl string) (*websocket.Conn
 	headers.Add("X-Webpa-Manufacturer", headerInfo.manufacturer)
 
 	//make sure destUrl's protocol is websocket (ws)
-	destUrl = strings.Replace(destUrl, "http", "ws", 1)
+	wsURL = strings.Replace(httpURL, "http", "ws", 1)
 
 	// creates a new client connection given the URL string
-	connection, resp, err := websocket.DefaultDialer.Dial(destUrl, headers)
+	connection, resp, err := websocket.DefaultDialer.Dial(wsURL, headers)
 
 	if err == websocket.ErrBadHandshake && resp.StatusCode == http.StatusTemporaryRedirect {
 		//Get url to which we are redirected and reconfigure it
-		destUrl = strings.Replace(resp.Header.Get("Location"), "http", "ws", 1)
+		wsURL = strings.Replace(resp.Header.Get("Location"), "http", "ws", 1)
 
-		connection, _, err = websocket.DefaultDialer.Dial(destUrl, headers)
+		connection, _, err = websocket.DefaultDialer.Dial(wsURL, headers)
 	}
 
 	if err != nil {
 		return nil, "", err
 	}
 
-	return connection, destUrl, nil
+	return connection, wsURL, nil
 }

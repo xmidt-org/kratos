@@ -3,7 +3,6 @@ package kratos
 import (
 	"bytes"
 	"errors"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -31,7 +30,7 @@ var (
 		FirmwareName:   "TG1682_2.1p7s1_PROD_sey",
 		ModelName:      "TG1682G",
 		Manufacturer:   "ARRIS Group, Inc.",
-		DestinationUrl: "",
+		DestinationURL: "",
 		Handlers: []HandlerRegistry{
 			{
 				HandlerKey: "/foo",
@@ -64,7 +63,7 @@ var (
 
 	goodMsg []byte
 
-	ErrFoo = errors.New("This was supposed to happen.")
+	ErrFoo = errors.New("this was supposed to happen")
 
 	upgrader = &websocket.Upgrader{
 		ReadBufferSize:  socketBufferSize,
@@ -113,15 +112,6 @@ func (m *mockConnection) Close() error {
 	return arguments.Error(0)
 }
 
-type mockMessage struct {
-	mock.Mock
-}
-
-func (m *mockMessage) WriteTo(output io.Writer) (int64, error) {
-	arguments := m.Called(output)
-	return arguments.Get(0).(int64), arguments.Error(1)
-}
-
 /******************* END MOCK DECLARATIONS ************************/
 
 type myReadHandler struct {
@@ -143,7 +133,7 @@ func TestMain(m *testing.M) {
 	}))
 	defer testServer.Close()
 
-	testClientFactory.DestinationUrl = testServer.URL
+	testClientFactory.DestinationURL = testServer.URL
 
 	wrpMsg := wrp.SimpleRequestResponse{
 		Source:          "mac:ffffff112233/emu",
@@ -181,11 +171,11 @@ func TestNewBrokenMAC(t *testing.T) {
 
 func TestNewBrokenURL(t *testing.T) {
 	assert := assert.New(t)
-	goodURL := testClientFactory.DestinationUrl
-	testClientFactory.DestinationUrl = "broken.url"
+	goodURL := testClientFactory.DestinationURL
+	testClientFactory.DestinationURL = "broken.url"
 	_, err := testClientFactory.New()
 
-	testClientFactory.DestinationUrl = goodURL
+	testClientFactory.DestinationURL = goodURL
 	assert.NotNil(err)
 }
 
@@ -197,10 +187,10 @@ func TestBadHandshake(t *testing.T) {
 	}))
 	defer brokenServer.Close()
 
-	testClientFactory.DestinationUrl = brokenServer.URL
+	testClientFactory.DestinationURL = brokenServer.URL
 	_, err := testClientFactory.New()
 
-	testClientFactory.DestinationUrl = testServer.URL
+	testClientFactory.DestinationURL = testServer.URL
 
 	assert.NotNil(err)
 }
@@ -316,7 +306,7 @@ func TestRead(t *testing.T) {
 	fakeConn.On("ReadMessage").Return(0, goodMsg, nil)
 
 	testClient := &client{
-		deviceId:        testClientFactory.DeviceName,
+		deviceID:        testClientFactory.DeviceName,
 		userAgent:       "",
 		deviceProtocols: "",
 		handlers: []HandlerRegistry{
