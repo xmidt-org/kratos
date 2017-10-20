@@ -1,5 +1,5 @@
-hash: d011d3f0b8fdae1ddc21a16cd6c4eee0c3566e2f4a88ce09b4cb3f87f3f485b1
-updated: 2017-10-20T10:05:24.030637757-07:00
+hash: 55240a60f643bf2bb84ca06487aeb203f14dbd999f152a04aba4d7c73f98da05
+updated: 2017-10-20T10:29:37.470110512-07:00
 imports:
 - name: github.com/Comcast/webpa-common
   version: 9d9218c77174931468a8f41f223550e6709215b6
@@ -22,7 +22,7 @@ imports:
 - name: github.com/gorilla/context
   version: 08b5f424b9271eedf6f9f0ce86cb9396ed337a42
 - name: github.com/gorilla/mux
-  version: 24fca303ac6da784b9e8269f724ddeb0b2eea5e7
+  version: 392c28fe23e1c45ddba891b0320b3b5df220beea
 - name: github.com/gorilla/websocket
   version: e8f0f8aaa98dfb6586cbdf2978d511e3199a960a
 - name: github.com/hashicorp/hcl
@@ -59,7 +59,7 @@ imports:
 - name: github.com/spf13/viper
   version: 25b30aa063fc18e48662b86996252eabdcf2f0c7
 - name: github.com/ugorji/go
-  version: faddd6128c66c4708f45fdc007f575f75e592a3c
+  version: d23841a297e5489e787e72fceffabf9d2994b52a
   subpackages:
   - codec
 - name: golang.org/x/sys

@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
+	"kratos" //replace it to have it as a proper import
+	"sync"
+
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/wrp"
-	"github.com/nu7hatch/gouuid"
-	"sync"
-	"kratos" //replace it to have it as a proper import
 )
 
 var (
@@ -63,14 +63,13 @@ func main() {
 			fmt.Println("We missed the ping!")
 			return nil
 		},
-		ClientLogger: logging.New(nil) ,
+		ClientLogger: logging.New(nil),
 	}).New()
 	if err != nil {
 		fmt.Println("Error making client: ", err)
 	}
 
-	// generate a uuid for use below in the clientMessage
-	u4, err := uuid.NewV4()
+	optionalUUID := "IamOptional"
 	if err != nil {
 		fmt.Println("Error generating uuid: ", err)
 	}
@@ -78,8 +77,8 @@ func main() {
 	// construct a client message for us to send to the server
 	myMessage := wrp.SimpleRequestResponse{
 		Source:          "mac:ffffff112233/emu",
-		Destination:            "event:device-status/bla/bla",
-		TransactionUUID: "emu:" + u4.String(),
+		Destination:     "event:device-status/bla/bla",
+		TransactionUUID: "emu:" + optionalUUID,
 		Payload:         []byte("the payload has reached the checkpoint"),
 	}
 
