@@ -2,16 +2,16 @@ package kratos
 
 import (
 	"bytes"
-	"github.com/Comcast/webpa-common/canonical"
-	"github.com/Comcast/webpa-common/logging"
-	"github.com/Comcast/webpa-common/wrp"
-	"github.com/gorilla/websocket"
-	"io"
-	"io/ioutil"
 	"net/http"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/Comcast/webpa-common/device"
+	"github.com/Comcast/webpa-common/logging"
+	"github.com/Comcast/webpa-common/wrp"
+	"github.com/go-kit/kit/log"
+	"github.com/gorilla/websocket"
 )
 
 const (
@@ -31,7 +31,7 @@ type ClientFactory struct {
 	DestinationUrl string
 	Handlers       []HandlerRegistry
 	HandlePingMiss HandlePingMiss
-	ClientLogger   logging.Logger
+	ClientLogger   log.Logger
 }
 
 // New is used to create a new kratos Client from a ClientFactory
@@ -78,8 +78,8 @@ func (f *ClientFactory) New() (Client, error) {
 		newClient.Logger = f.ClientLogger
 		myPingMissHandler.Logger = f.ClientLogger
 	} else {
-		newClient.Logger = &logging.LoggerWriter{ioutil.Discard}
-		myPingMissHandler.Logger = &logging.LoggerWriter{ioutil.Discard}
+		newClient.Logger = logging.DefaultLogger()
+		myPingMissHandler.Logger = logging.DefaultLogger()
 	}
 
 	for i := range newClient.handlers {
@@ -103,7 +103,7 @@ type HandlePingMiss func() error
 
 type pingMissHandler struct {
 	handlePingMiss HandlePingMiss
-	logging.Logger
+	log.Logger
 }
 
 func (pmh *pingMissHandler) checkPing(inTimer *time.Timer, pinged <-chan string, inClient Client) {
@@ -113,11 +113,11 @@ func (pmh *pingMissHandler) checkPing(inTimer *time.Timer, pinged <-chan string,
 	for !pingMiss {
 		select {
 		case <-inTimer.C:
-			pmh.Info("Ping miss, calling handler and closing client!")
+			logging.Info(pmh).Log(logging.MessageKey(), "Ping miss, calling handler and closing client!")
 			pingMiss = true
 			err := pmh.handlePingMiss()
 			if err != nil {
-				pmh.Info("Error handling ping miss:", err)
+				logging.Info(pmh).Log(logging.MessageKey(), "Error handling ping miss:", logging.ErrorKey(), err)
 			}
 		case <-pinged:
 			if !inTimer.Stop() {
@@ -131,7 +131,7 @@ func (pmh *pingMissHandler) checkPing(inTimer *time.Timer, pinged <-chan string,
 // Client is what function calls we expose to the user of kratos
 type Client interface {
 	Hostname() string
-	Send(message io.WriterTo) error
+	Send(message interface{}) error
 	Close() error
 }
 
@@ -163,7 +163,7 @@ type client struct {
 	handlers        []HandlerRegistry
 	connection      websocketConnection
 	headerInfo      *clientHeader
-	logging.Logger
+	log.Logger
 }
 
 // used to track everything that we want to know about the client headers
@@ -179,21 +179,20 @@ func (c *client) Hostname() string {
 }
 
 // used to open a channel for writing to servers
-func (c *client) Send(message io.WriterTo) (err error) {
-	c.Info("Sending message...")
+func (c *client) Send(message interface{}) (err error) {
+	logging.Info(c).Log(logging.MessageKey(), "Sending message...")
 
 	var buffer bytes.Buffer
-	if _, err = message.WriteTo(&buffer); err != nil {
-		return
-	}
 
-	err = c.connection.WriteMessage(websocket.BinaryMessage, buffer.Bytes())
+	if err = wrp.NewEncoder(&buffer, wrp.Msgpack).Encode(message); err == nil {
+		err = c.connection.WriteMessage(websocket.BinaryMessage, buffer.Bytes())
+	}
 	return
 }
 
 // will close the connection to the server
 func (c *client) Close() (err error) {
-	c.Info("Closing client...")
+	logging.Info(c).Log("Closing client...")
 
 	err = c.connection.Close()
 	return
@@ -201,7 +200,7 @@ func (c *client) Close() (err error) {
 
 // going to be used to access the HandleMessage() function
 func (c *client) read() (err error) {
-	c.Info("Reading message...")
+	logging.Info(c).Log("Reading message...")
 
 	for {
 		var serverMessage []byte
@@ -211,17 +210,16 @@ func (c *client) read() (err error) {
 		}
 
 		// decode the message so we can read it
-		var data interface{}
-		data, err = wrp.Decode(serverMessage)
+		wrpData := wrp.Message{}
+		err = wrp.NewDecoderBytes(serverMessage, wrp.Msgpack).Decode(&wrpData)
+
 		if err != nil {
 			return
 		}
 
-		if _, ok := data.(wrp.WrpMsg); ok {
-			for i := 0; i < len(c.handlers); i++ {
-				if c.handlers[i].keyRegex.MatchString(data.(wrp.WrpMsg).Destination()) {
-					c.handlers[i].Handler.HandleMessage(data)
-				}
+		for i := 0; i < len(c.handlers); i++ {
+			if c.handlers[i].keyRegex.MatchString(wrpData.Destination) {
+				c.handlers[i].Handler.HandleMessage(wrpData)
 			}
 		}
 	}
@@ -231,7 +229,7 @@ func (c *client) read() (err error) {
 
 // private func used to generate the client that we're looking to produce
 func createConnection(headerInfo *clientHeader, destUrl string) (*websocket.Conn, string, error) {
-	_, err := canonical.ParseId(headerInfo.deviceName)
+	_, err := device.ParseID(headerInfo.deviceName)
 	if err != nil {
 		return nil, "", err
 	}
@@ -248,7 +246,7 @@ func createConnection(headerInfo *clientHeader, destUrl string) (*websocket.Conn
 	destUrl = strings.Replace(destUrl, "http", "ws", 1)
 
 	// creates a new client connection given the URL string
-	connection, resp , err := websocket.DefaultDialer.Dial(destUrl, headers)
+	connection, resp, err := websocket.DefaultDialer.Dial(destUrl, headers)
 
 	if err == websocket.ErrBadHandshake && resp.StatusCode == http.StatusTemporaryRedirect {
 		//Get url to which we are redirected and reconfigure it
@@ -261,6 +259,5 @@ func createConnection(headerInfo *clientHeader, destUrl string) (*websocket.Conn
 		return nil, "", err
 	}
 
-	return connection, destUrl ,nil
+	return connection, destUrl, nil
 }
-

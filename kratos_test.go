@@ -3,11 +3,6 @@ package kratos
 import (
 	"bytes"
 	"errors"
-	"github.com/Comcast/webpa-common/logging"
-	"github.com/Comcast/webpa-common/wrp"
-	"github.com/gorilla/websocket"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -16,6 +11,12 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/Comcast/webpa-common/logging"
+	"github.com/Comcast/webpa-common/wrp"
+	"github.com/gorilla/websocket"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 const (
@@ -83,7 +84,7 @@ func (m *mockClient) Hostname() string {
 	return arguments.String(0)
 }
 
-func (m *mockClient) Send(message io.WriterTo) error {
+func (m *mockClient) Send(message interface{}) error {
 	arguments := m.Called(message)
 	return arguments.Error(0)
 }
@@ -144,12 +145,18 @@ func TestMain(m *testing.M) {
 
 	testClientFactory.DestinationUrl = testServer.URL
 
-	goodMsg, _ = (wrp.SimpleReqResponseMsg{
+	wrpMsg := wrp.SimpleRequestResponse{
 		Source:          "mac:ffffff112233/emu",
-		Dest:            "/bar",
+		Destination:     "/bar",
 		TransactionUUID: "emu:unique",
 		Payload:         []byte("the payload has reached the checkpoint"),
-	}).Encode()
+	}
+
+	var buf bytes.Buffer
+
+	wrp.NewEncoder(&buf, wrp.Msgpack).Encode(wrpMsg)
+
+	goodMsg = buf.Bytes()
 
 	os.Exit(m.Run())
 }
@@ -210,7 +217,7 @@ func TestCheckPingTimeout(t *testing.T) {
 			timesCalled++
 			return nil
 		},
-		Logger: &logging.LoggerWriter{os.Stdout},
+		Logger: logging.New(nil),
 	}
 
 	pingTimer := time.NewTimer(time.Duration(1) * time.Second)
@@ -225,76 +232,42 @@ func TestCheckPingTimeout(t *testing.T) {
 // test the happy-path of sending a message through a websocket
 func TestSend(t *testing.T) {
 	assert := assert.New(t)
-	const expectedByteCount = 42
-	var buffer bytes.Buffer
-
 	fakeConn := &mockConnection{}
-	fakeConn.On("WriteMessage", websocket.BinaryMessage, buffer.Bytes()).Return(nil).Once()
+	fakeConn.On("WriteMessage", websocket.BinaryMessage, mock.AnythingOfType("[]uint8")).Return(nil).Once()
 
-	fakeMsg := &mockMessage{}
-	fakeMsg.On(
-		"WriteTo",
-		mock.MatchedBy(func(io.Writer) bool { return true }),
-	).Return(int64(expectedByteCount), nil).Once()
+	myMessage := wrp.SimpleRequestResponse{
+		Source:      "mac:ffffff112233/emu",
+		Destination: "event:device-status/bla/bla",
+		Payload:     []byte("the payload has reached the checkpoint"),
+	}
 
 	testClient := &client{
 		connection: fakeConn,
-		Logger:     &logging.LoggerWriter{os.Stdout},
+		Logger:     logging.New(nil),
 	}
 
-	err := testClient.Send(fakeMsg)
+	err := testClient.Send(myMessage)
 
 	assert.Nil(err)
 	fakeConn.AssertExpectations(t)
-	fakeMsg.AssertExpectations(t)
 }
 
 // test what happens when a websocket fails to write a message
 func TestSendBrokenWriteMessage(t *testing.T) {
 	assert := assert.New(t)
-	const expectedByteCount = 42
-	var buffer bytes.Buffer
 
 	fakeConn := &mockConnection{}
-	fakeConn.On("WriteMessage", websocket.BinaryMessage, buffer.Bytes()).Return(ErrFoo).Once()
-
-	fakeMsg := &mockMessage{}
-	fakeMsg.On(
-		"WriteTo",
-		mock.MatchedBy(func(io.Writer) bool { return true }),
-	).Return(int64(expectedByteCount), nil).Once()
+	fakeConn.On("WriteMessage", websocket.BinaryMessage, mock.AnythingOfType("[]uint8")).Return(ErrFoo).Once()
 
 	testClient := &client{
 		connection: fakeConn,
-		Logger:     &logging.LoggerWriter{os.Stdout},
+		Logger:     logging.New(nil),
 	}
 
-	err := testClient.Send(fakeMsg)
+	err := testClient.Send(nil)
 
 	assert.NotNil(err)
 	fakeConn.AssertExpectations(t)
-	fakeMsg.AssertExpectations(t)
-}
-
-// test what happens when the io.WriterTo fails to write to the buffer
-func TestSendBrokenWriter(t *testing.T) {
-	assert := assert.New(t)
-	const expectedByteCount = 42
-
-	fakeMsg := &mockMessage{}
-	fakeMsg.On(
-		"WriteTo",
-		mock.MatchedBy(func(io.Writer) bool { return true }),
-	).Return(int64(expectedByteCount), ErrFoo).Once()
-
-	testClient := &client{
-		Logger: &logging.LoggerWriter{os.Stdout},
-	}
-
-	err := testClient.Send(fakeMsg)
-
-	assert.NotNil(err)
-	fakeMsg.AssertExpectations(t)
 }
 
 // test the happy path of closing a websocket once we're finished using it
@@ -306,7 +279,7 @@ func TestClose(t *testing.T) {
 
 	testClient := &client{
 		connection: fakeConn,
-		Logger:     &logging.LoggerWriter{os.Stdout},
+		Logger:     logging.New(nil),
 	}
 
 	err := testClient.Close()
@@ -324,7 +297,7 @@ func TestCloseBroken(t *testing.T) {
 
 	testClient := &client{
 		connection: fakeConn,
-		Logger:     &logging.LoggerWriter{os.Stdout},
+		Logger:     logging.New(nil),
 	}
 
 	err := testClient.Close()
@@ -358,7 +331,7 @@ func TestRead(t *testing.T) {
 		},
 		connection: fakeConn,
 		headerInfo: nil,
-		Logger:     &logging.LoggerWriter{os.Stdout},
+		Logger:     logging.New(nil),
 	}
 
 	testClient.handlers[0].keyRegex, _ = regexp.Compile(testClient.handlers[0].HandlerKey)
