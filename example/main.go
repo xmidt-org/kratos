@@ -2,12 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/Comcast/kratos"
+	"kratos" //replace it to have it as a proper import in your project
+	"sync"
+
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/wrp"
-	"github.com/nu7hatch/gouuid"
-	"os"
-	"sync"
 )
 
 var (
@@ -36,7 +35,7 @@ func main() {
 		FirmwareName:   "TG1682_2.1p7s1_PROD_sey",
 		ModelName:      "TG1682G",
 		Manufacturer:   "ARRIS Group, Inc.",
-		DestinationUrl: "https://fabric-cd.webpa.comcast.net:8080/api/v2/device",
+		DestinationURL: "https://fabric-cd.webpa.comcast.net:8080/api/v2/device",
 		Handlers: []kratos.HandlerRegistry{
 			{
 				HandlerKey: "/foo",
@@ -64,27 +63,26 @@ func main() {
 			fmt.Println("We missed the ping!")
 			return nil
 		},
-		ClientLogger: &logging.LoggerWriter{os.Stdout},
+		ClientLogger: logging.New(nil),
 	}).New()
 	if err != nil {
 		fmt.Println("Error making client: ", err)
 	}
 
-	// generate a uuid for use below in the clientMessage
-	u4, err := uuid.NewV4()
+	optionalUUID := "IamOptional"
 	if err != nil {
 		fmt.Println("Error generating uuid: ", err)
 	}
 
 	// construct a client message for us to send to the server
-	myMessage := wrp.SimpleReqResponseMsg{
+	myMessage := wrp.SimpleRequestResponse{
 		Source:          "mac:ffffff112233/emu",
-		Dest:            "event:device-status/bla/bla",
-		TransactionUUID: "emu:" + u4.String(),
+		Destination:     "event:device-status/bla/bla",
+		TransactionUUID: "emu:" + optionalUUID,
 		Payload:         []byte("the payload has reached the checkpoint"),
 	}
 
-	if err = client.Send(wrp.WriterTo(myMessage)); err != nil {
+	if err = client.Send(myMessage); err != nil {
 		fmt.Println("Error sending message: ", err)
 	}
 
