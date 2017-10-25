@@ -1,7 +1,7 @@
 package: github.com/Comcast/kratos
 import:
 - package: github.com/Comcast/webpa-common
-  version: 9d9218c77174931468a8f41f223550e6709215b6
+  version: 312031c04577e73353e9529a8955ad194fe1e62c
 - package: github.com/gorilla/websocket
   version: e8f0f8aaa98dfb6586cbdf2978d511e3199a960a
 - package: github.com/go-kit/kit
