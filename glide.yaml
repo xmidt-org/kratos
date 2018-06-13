@@ -1,14 +1,4 @@
 package: github.com/Comcast/kratos
 import:
 - package: github.com/Comcast/webpa-common
-  version: 312031c04577e73353e9529a8955ad194fe1e62c
-- package: github.com/gorilla/websocket
-  version: e8f0f8aaa98dfb6586cbdf2978d511e3199a960a
-- package: github.com/go-kit/kit
-  version: 0.5.0
-testImport:
-- package: github.com/stretchr/testify
-  version: 18a02ba4a312f95da08ff4cfc0055750ce50ae9e
-  subpackages:
-  - assert
-  - mock
+  version: d1025b7d8ef6926721f0c40ddd423cab7ded90da 

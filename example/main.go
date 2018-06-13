@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
-	"kratos" //replace it to have it as a proper import in your project
 	"sync"
 
+	"github.com/Comcast/kratos"
 	"github.com/Comcast/webpa-common/logging"
 	"github.com/Comcast/webpa-common/wrp"
 )
