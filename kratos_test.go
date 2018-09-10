@@ -2,6 +2,7 @@ package kratos
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -99,6 +100,11 @@ type mockConnection struct {
 
 func (m *mockConnection) WriteMessage(messageType int, data []byte) error {
 	arguments := m.Called(messageType, data)
+	return arguments.Error(0)
+}
+
+func (m *mockConnection) WriteControl(messageType int, data []byte, deadline time.Time) error {
+	arguments := m.Called(messageType, data, deadline)
 	return arguments.Error(0)
 }
 
@@ -252,6 +258,8 @@ func TestSendBrokenWriteMessage(t *testing.T) {
 	testClient := &client{
 		connection: fakeConn,
 		Logger:     logging.New(nil),
+
+		done: make(chan struct{}),
 	}
 
 	err := testClient.Send(nil)
@@ -270,6 +278,8 @@ func TestClose(t *testing.T) {
 	testClient := &client{
 		connection: fakeConn,
 		Logger:     logging.New(nil),
+
+		done: make(chan struct{}),
 	}
 
 	err := testClient.Close()
@@ -288,6 +298,8 @@ func TestCloseBroken(t *testing.T) {
 	testClient := &client{
 		connection: fakeConn,
 		Logger:     logging.New(nil),
+
+		done: make(chan struct{}),
 	}
 
 	err := testClient.Close()
@@ -302,8 +314,12 @@ func TestCloseBroken(t *testing.T) {
 func TestRead(t *testing.T) {
 	assert := assert.New(t)
 
+	readDataChan := make(chan *wrp.Message)
+	readCloseChan := make(chan int)
+	readErrChan := make(chan error)
+
 	fakeConn := &mockConnection{}
-	fakeConn.On("ReadMessage").Return(0, goodMsg, nil)
+	fakeConn.On("ReadMessage").Return(0, goodMsg, nil).Once()
 
 	testClient := &client{
 		deviceID:        testClientFactory.DeviceName,
@@ -326,14 +342,230 @@ func TestRead(t *testing.T) {
 
 	testClient.handlers[0].keyRegex, _ = regexp.Compile(testClient.handlers[0].HandlerKey)
 
-	mainWG.Add(1)
 	var err error
 	go func() {
-		err = testClient.read()
+		err = testClient.read(readDataChan, readErrChan, readCloseChan)
 	}()
 
-	mainWG.Wait()
-
+	<-readDataChan
 	assert.Nil(err)
+	fakeConn.AssertExpectations(t)
+}
+
+func TestCloseRead(t *testing.T) {
+	assert := assert.New(t)
+
+	readDataChan := make(chan *wrp.Message)
+	readCloseChan := make(chan int)
+	readErrChan := make(chan error)
+
+	fakeConn := &mockConnection{}
+
+	var testError error
+	testError = &websocket.CloseError{Code: websocket.CloseNormalClosure}
+
+	fakeConn.On("ReadMessage").Return(0, make([]byte, 0), testError).Once()
+
+	testClient := &client{
+		deviceID:        testClientFactory.DeviceName,
+		userAgent:       "",
+		deviceProtocols: "",
+		handlers: []HandlerRegistry{
+			{
+				HandlerKey: "/bar",
+				Handler: &myReadHandler{
+					helloMsg:      "Whaddup.",
+					goodbyeMsg:    "It's dat boi Kratos.",
+					handlerCalled: false,
+				},
+			},
+		},
+		connection: fakeConn,
+		headerInfo: nil,
+		Logger:     logging.New(nil),
+	}
+
+	testClient.handlers[0].keyRegex, _ = regexp.Compile(testClient.handlers[0].HandlerKey)
+
+	var err error
+	go func() {
+		err = testClient.read(readDataChan, readErrChan, readCloseChan)
+	}()
+
+	<-readCloseChan
+	assert.Equal(testError, err)
+	fakeConn.AssertExpectations(t)
+}
+
+func TestBadRead(t *testing.T) {
+	assert := assert.New(t)
+
+	readDataChan := make(chan *wrp.Message)
+	readCloseChan := make(chan int)
+	readErrChan := make(chan error)
+
+	fakeConn := &mockConnection{}
+
+	var testError error
+	testError = &websocket.CloseError{Code: websocket.CloseInternalServerErr}
+
+	fakeConn.On("ReadMessage").Return(0, make([]byte, 0), testError).Once()
+
+	testClient := &client{
+		deviceID:        testClientFactory.DeviceName,
+		userAgent:       "",
+		deviceProtocols: "",
+		handlers: []HandlerRegistry{
+			{
+				HandlerKey: "/bar",
+				Handler: &myReadHandler{
+					helloMsg:      "Whaddup.",
+					goodbyeMsg:    "It's dat boi Kratos.",
+					handlerCalled: false,
+				},
+			},
+		},
+		connection: fakeConn,
+		headerInfo: nil,
+		Logger:     logging.New(nil),
+	}
+
+	testClient.handlers[0].keyRegex, _ = regexp.Compile(testClient.handlers[0].HandlerKey)
+
+	var err error
+	go func() {
+		err = testClient.read(readDataChan, readErrChan, readCloseChan)
+	}()
+
+	<-readErrChan
+	assert.Equal(testError, err)
+	fakeConn.AssertExpectations(t)
+}
+
+func TestControlLoop(t *testing.T) {
+	assert := assert.New(t)
+
+	fakeConn := &mockConnection{}
+	fakeConn.On("WriteControl", websocket.PongMessage, mock.AnythingOfType("[]uint8"), mock.AnythingOfType("time.Time")).Return(nil).Once()
+
+	testClient := &client{
+		deviceID:        testClientFactory.DeviceName,
+		userAgent:       "",
+		deviceProtocols: "",
+		handlers: []HandlerRegistry{
+			{
+				HandlerKey: "/bar",
+				Handler: &myReadHandler{
+					helloMsg:      "Whaddup.",
+					goodbyeMsg:    "It's dat boi Kratos.",
+					handlerCalled: false,
+				},
+			},
+		},
+		headerInfo:    nil,
+		connection:    fakeConn,
+		Logger:        logging.New(nil),
+		eventHandlers: make(map[string][]EventHandler),
+		done:          make(chan struct{}),
+	}
+	testClient.handlers[0].keyRegex, _ = regexp.Compile(testClient.handlers[0].HandlerKey)
+
+	pingChan := make(chan string)
+	pongChan := make(chan string)
+
+	readDataChan := make(chan *wrp.Message)
+	readCloseChan := make(chan int)
+	readErrChan := make(chan error)
+
+	// test ping
+	count := 0
+	testClient.On("ping", func(args ...interface{}) error {
+		count++
+		return nil
+	})
+	go func() {
+		pingChan <- "PING"
+		testClient.done <- struct{}{}
+	}()
+
+	testClient.controlLoop(pingChan, pongChan, readDataChan, readErrChan, readCloseChan, context.Background())
+	assert.Equal(1, count, "ping was only sent once")
+
+	// test pong
+	count = 0
+	testClient.On("pong", func(args ...interface{}) error {
+		count++
+		return nil
+	})
+	go func() {
+		pongChan <- "PING"
+		testClient.done <- struct{}{}
+	}()
+
+	testClient.controlLoop(pingChan, pongChan, readDataChan, readErrChan, readCloseChan, context.Background())
+	assert.Equal(1, count, "pong was only sent once")
+
+	// test read
+	count = 0
+	testClient.On("message", func(args ...interface{}) error {
+		count++
+		return nil
+	})
+	go func() {
+		readDataChan <- &wrp.Message{}
+		testClient.done <- struct{}{}
+	}()
+
+	testClient.controlLoop(pingChan, pongChan, readDataChan, readErrChan, readCloseChan, context.Background())
+	assert.Equal(1, count, "pong was only sent once")
+
+	// test error
+	count = 0
+	testClient.On("error", func(args ...interface{}) error {
+		count++
+		return nil
+	})
+
+	go func() {
+		readErrChan <- errors.New("bad thing happened")
+		testClient.done <- struct{}{}
+	}()
+
+	testClient.controlLoop(pingChan, pongChan, readDataChan, readErrChan, readCloseChan, context.Background())
+	assert.Equal(1, count, "error was only sent once")
+
+	// test error
+	count = 0
+	testClient.On("close", func(args ...interface{}) error {
+		count++
+		return nil
+	})
+
+	go func() {
+		readCloseChan <- 1001
+		testClient.done <- struct{}{}
+	}()
+
+	testClient.controlLoop(pingChan, pongChan, readDataChan, readErrChan, readCloseChan, context.Background())
+	assert.Equal(1, count, "close was only sent once")
+
+	// test context
+	count = 0
+	testClient.On("done", func(args ...interface{}) error {
+		count++
+		return nil
+	})
+	go func() {
+		testClient.done <- struct{}{}
+	}()
+
+	testClient.controlLoop(pingChan, pongChan, readDataChan, readErrChan, readCloseChan, context.Background())
+	assert.Equal(1, count, "close was only sent once")
+
+	// test context
+	fakeConn.On("Close").Return(nil).Once()
+	ctx, _ := context.WithDeadline(context.Background(), time.Now().Add(time.Second))
+	testClient.controlLoop(pingChan, pongChan, readDataChan, readErrChan, readCloseChan, ctx)
+
 	fakeConn.AssertExpectations(t)
 }

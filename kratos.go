@@ -2,9 +2,11 @@ package kratos
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Comcast/webpa-common/device"
@@ -22,6 +24,8 @@ const (
 	pingWait = time.Duration(60) * time.Second
 )
 
+type EventHandler func(args ...interface{}) error
+
 // ClientFactory is used to generate a client by calling new on this type
 type ClientFactory struct {
 	DeviceName     string
@@ -32,10 +36,16 @@ type ClientFactory struct {
 	Handlers       []HandlerRegistry
 	HandlePingMiss HandlePingMiss
 	ClientLogger   log.Logger
+
+	EventHandlers map[string][]EventHandler
 }
 
 // New is used to create a new kratos Client from a ClientFactory
 func (f *ClientFactory) New() (Client, error) {
+	return f.NewWithContext(context.Background())
+}
+
+func (f *ClientFactory) NewWithContext(ctx context.Context) (Client, error) {
 	inHeader := &clientHeader{
 		deviceName:   f.DeviceName,
 		firmwareName: f.FirmwareName,
@@ -49,13 +59,6 @@ func (f *ClientFactory) New() (Client, error) {
 		return nil, err
 	}
 
-	pinged := make(chan string)
-	newConnection.SetPingHandler(func(appData string) error {
-		pinged <- appData
-		err := newConnection.WriteControl(websocket.PongMessage, []byte(appData), time.Now().Add(writeWait))
-		return err
-	})
-
 	// at this point we know that the URL connection is legitimate, so we can do some string manipulation
 	// with the knowledge that `:` will be found in the string twice
 	connectionURL = connectionURL[len("ws://"):strings.LastIndex(connectionURL, ":")]
@@ -68,6 +71,9 @@ func (f *ClientFactory) New() (Client, error) {
 		handlers:        f.Handlers,
 		connection:      newConnection,
 		headerInfo:      inHeader,
+
+		done:          make(chan struct{}),
+		eventHandlers: f.EventHandlers,
 	}
 
 	myPingMissHandler := pingMissHandler{
@@ -91,8 +97,19 @@ func (f *ClientFactory) New() (Client, error) {
 
 	pingTimer := time.NewTimer(pingWait)
 
-	go myPingMissHandler.checkPing(pingTimer, pinged, newClient)
-	go newClient.read()
+	// Pass ping/pong events through the main control loop
+	pingChan := make(chan string)
+	pongChan := make(chan string)
+	newConnection.SetPingHandler(func(msg string) error { pingChan <- msg; return nil })
+	newConnection.SetPongHandler(func(pingID string) error { pongChan <- pingID; return nil })
+
+	readDataChan := make(chan *wrp.Message)
+	readCloseChan := make(chan int)
+	readErrChan := make(chan error)
+
+	go myPingMissHandler.checkPing(pingTimer, pingChan, newClient)
+	go newClient.readPump(readDataChan, readErrChan, readCloseChan)
+	go newClient.controlLoop(pingChan, pongChan, readDataChan, readErrChan, readCloseChan, ctx)
 
 	return newClient, nil
 }
@@ -137,6 +154,7 @@ type Client interface {
 
 type websocketConnection interface {
 	WriteMessage(messageType int, data []byte) error
+	WriteControl(messageType int, data []byte, deadline time.Time) error
 	ReadMessage() (messageType int, p []byte, err error)
 	Close() error
 }
@@ -164,6 +182,10 @@ type client struct {
 	connection      websocketConnection
 	headerInfo      *clientHeader
 	log.Logger
+
+	eventHandlers map[string][]EventHandler
+	shutdownOnce  sync.Once
+	done          chan struct{}
 }
 
 // used to track everything that we want to know about the client headers
@@ -172,6 +194,64 @@ type clientHeader struct {
 	firmwareName string
 	modelName    string
 	manufacturer string
+}
+
+func (c *client) controlLoop(pingChan <-chan string,
+	pongChan <-chan string,
+	readDataChan <-chan *wrp.Message,
+	readErrChan <-chan error,
+	readCloseChan <-chan int,
+	ctx context.Context) error {
+	var err error
+	for {
+		select {
+		case pingData := <-pingChan:
+			// Handle pings received from the server
+			// - trigger the `ping` event
+			// - reply with pong (needed when `SetPingHandler` is overwritten)
+			err := c.connection.WriteControl(websocket.PongMessage, []byte(pingData), time.Now().Add(writeWait))
+			if err != nil {
+				c.handleEvent("error", err)
+			}
+			c.handleEvent("ping")
+		case pongData := <-pongChan:
+			c.handleEvent("pong", pongData)
+		case wrpData := <-readDataChan:
+			for i := 0; i < len(c.handlers); i++ {
+				if c.handlers[i].keyRegex.MatchString(wrpData.Destination) {
+					c.handlers[i].Handler.HandleMessage(wrpData)
+				}
+			}
+			c.handleEvent("message", wrpData)
+		case readErr := <-readErrChan:
+			c.handleEvent("error", readErr)
+		case readClose := <-readCloseChan:
+			c.handleEvent("close", readClose)
+		case <-ctx.Done():
+			err = c.Close()
+		case <-c.done:
+			c.handleEvent("done")
+			return err
+		}
+	}
+}
+
+func (c *client) handleEvent(event string, args ...interface{}) {
+	if handlers, ok := c.eventHandlers[event]; ok {
+		for _, handler := range handlers {
+			if err := handler(args...); err != nil {
+				c.Log(logging.MessageKey(), "Unhandled Error", "err", err)
+			}
+		}
+	}
+}
+
+func (c *client) On(event string, handler EventHandler) {
+	if handlers, ok := c.eventHandlers[event]; ok {
+		handlers = append(handlers, handler)
+	} else {
+		c.eventHandlers[event] = []EventHandler{handler}
+	}
 }
 
 func (c *client) Hostname() string {
@@ -187,6 +267,9 @@ func (c *client) Send(message interface{}) (err error) {
 	if err = wrp.NewEncoder(&buffer, wrp.Msgpack).Encode(message); err == nil {
 		err = c.connection.WriteMessage(websocket.BinaryMessage, buffer.Bytes())
 	}
+	if err != nil {
+		c.handleEvent("error", err)
+	}
 	return
 }
 
@@ -194,36 +277,52 @@ func (c *client) Send(message interface{}) (err error) {
 func (c *client) Close() (err error) {
 	logging.Info(c).Log("Closing client...")
 
-	err = c.connection.Close()
+	c.shutdownOnce.Do(func() {
+		// trigger `close` event when the client closes the connection
+		c.handleEvent("close")
+		err = c.connection.Close()
+
+		// Stops the main control loop
+		close(c.done)
+	})
+	return
+}
+
+func (c *client) read(readChan chan *wrp.Message, errorChan chan error, closeChan chan int) (err error) {
+	var serverMessage []byte
+	_, serverMessage, err = c.connection.ReadMessage()
+	if err != nil {
+		if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
+			closeChan <- err.(*websocket.CloseError).Code
+		} else if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway) {
+			// Emit the error if it is not CloseNormalClosure
+			// and the error is not  originated from closing the socket ourselves with `CloseGoingAway`
+			errorChan <- err
+		}
+
+		//CloseGoingAway errors are ignored
+		return
+	}
+
+	// decode the message so we can read it
+	wrpData := wrp.Message{}
+	err = wrp.NewDecoderBytes(serverMessage, wrp.Msgpack).Decode(&wrpData)
+
+	if err != nil {
+		return
+	}
+	readChan <- &wrpData
 	return
 }
 
 // going to be used to access the HandleMessage() function
-func (c *client) read() (err error) {
+func (c *client) readPump(readChan chan *wrp.Message, errorChan chan error, closeChan chan int) (err error) {
 	logging.Info(c).Log("Reading message...")
+	defer func() { logging.Warn(c).Log("Stopped reading messages") }()
 
 	for {
-		var serverMessage []byte
-		_, serverMessage, err = c.connection.ReadMessage()
-		if err != nil {
-			return
-		}
-
-		// decode the message so we can read it
-		wrpData := wrp.Message{}
-		err = wrp.NewDecoderBytes(serverMessage, wrp.Msgpack).Decode(&wrpData)
-
-		if err != nil {
-			return
-		}
-
-		for i := 0; i < len(c.handlers); i++ {
-			if c.handlers[i].keyRegex.MatchString(wrpData.Destination) {
-				c.handlers[i].Handler.HandleMessage(wrpData)
-			}
-		}
+		err = c.read(readChan, errorChan, closeChan)
 	}
-
 	return
 }
 
