@@ -94,20 +94,20 @@ func (f *ClientFactory) NewWithContext(ctx context.Context) (Client, error) {
 			return nil, err
 		}
 	}
-
+	pinged := make(chan string)
 	pingTimer := time.NewTimer(pingWait)
 
 	// Pass ping/pong events through the main control loop
 	pingChan := make(chan string)
 	pongChan := make(chan string)
-	newConnection.SetPingHandler(func(msg string) error { pingChan <- msg; return nil })
+	newConnection.SetPingHandler(func(msg string) error { pinged <- msg; pingChan <- msg; return nil })
 	newConnection.SetPongHandler(func(pingID string) error { pongChan <- pingID; return nil })
 
 	readDataChan := make(chan *wrp.Message)
 	readCloseChan := make(chan int)
 	readErrChan := make(chan error)
 
-	go myPingMissHandler.checkPing(pingTimer, pingChan, newClient)
+	go myPingMissHandler.checkPing(pingTimer, pinged, newClient)
 	go newClient.readPump(readDataChan, readErrChan, readCloseChan)
 	go newClient.controlLoop(pingChan, pongChan, readDataChan, readErrChan, readCloseChan, ctx)
 
