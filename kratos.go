@@ -148,6 +148,7 @@ func (pmh *pingMissHandler) checkPing(inTimer *time.Timer, pinged <-chan string,
 // Client is what function calls we expose to the user of kratos
 type Client interface {
 	Hostname() string
+	On(event string, handler EventHandler)
 	Send(message interface{}) error
 	Close() error
 }
