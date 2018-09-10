@@ -219,7 +219,7 @@ func (c *client) controlLoop(pingChan <-chan string,
 		case wrpData := <-readDataChan:
 			for i := 0; i < len(c.handlers); i++ {
 				if c.handlers[i].keyRegex.MatchString(wrpData.Destination) {
-					c.handlers[i].Handler.HandleMessage(wrpData)
+					c.handlers[i].Handler.HandleMessage(*wrpData)
 				}
 			}
 			c.handleEvent("message", wrpData)
@@ -322,8 +322,11 @@ func (c *client) readPump(readChan chan *wrp.Message, errorChan chan error, clos
 
 	for {
 		err = c.read(readChan, errorChan, closeChan)
+		if err != nil {
+			return err
+		}
 	}
-	return
+	return nil
 }
 
 // private func used to generate the client that we're looking to produce
