@@ -84,6 +84,11 @@ func (m *mockClient) Hostname() string {
 	return arguments.String(0)
 }
 
+func (m *mockClient) OnEvent(event string, handler EventHandler) {
+	arguments := m.Called(event, handler)
+	arguments.Error(0)
+}
+
 func (m *mockClient) Send(message interface{}) error {
 	arguments := m.Called(message)
 	return arguments.Error(0)
@@ -479,7 +484,7 @@ func TestControlLoop(t *testing.T) {
 
 	// test ping
 	count := 0
-	testClient.On("ping", func(args ...interface{}) error {
+	testClient.OnEvent("ping", func(args ...interface{}) error {
 		count++
 		return nil
 	})
@@ -493,7 +498,7 @@ func TestControlLoop(t *testing.T) {
 
 	// test pong
 	count = 0
-	testClient.On("pong", func(args ...interface{}) error {
+	testClient.OnEvent("pong", func(args ...interface{}) error {
 		count++
 		return nil
 	})
@@ -507,7 +512,7 @@ func TestControlLoop(t *testing.T) {
 
 	// test read
 	count = 0
-	testClient.On("message", func(args ...interface{}) error {
+	testClient.OnEvent("message", func(args ...interface{}) error {
 		count++
 		return nil
 	})
@@ -521,7 +526,7 @@ func TestControlLoop(t *testing.T) {
 
 	// test error
 	count = 0
-	testClient.On("error", func(args ...interface{}) error {
+	testClient.OnEvent("error", func(args ...interface{}) error {
 		count++
 		return nil
 	})
@@ -536,7 +541,7 @@ func TestControlLoop(t *testing.T) {
 
 	// test error
 	count = 0
-	testClient.On("close", func(args ...interface{}) error {
+	testClient.OnEvent("close", func(args ...interface{}) error {
 		count++
 		return nil
 	})
@@ -551,7 +556,7 @@ func TestControlLoop(t *testing.T) {
 
 	// test context
 	count = 0
-	testClient.On("done", func(args ...interface{}) error {
+	testClient.OnEvent("done", func(args ...interface{}) error {
 		count++
 		return nil
 	})
