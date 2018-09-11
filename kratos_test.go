@@ -502,13 +502,17 @@ func TestControlLoop(t *testing.T) {
 		count++
 		return nil
 	})
+	testClient.OnEvent("pong", func(args ...interface{}) error {
+		count++
+		return nil
+	})
 	go func() {
-		pongChan <- "PING"
+		pongChan <- "PONG"
 		testClient.done <- struct{}{}
 	}()
 
 	testClient.controlLoop(pingChan, pongChan, readDataChan, readErrChan, readCloseChan, context.Background())
-	assert.Equal(1, count, "pong was only sent once")
+	assert.Equal(2, count, "pong was only sent once with two handlers")
 
 	// test read
 	count = 0

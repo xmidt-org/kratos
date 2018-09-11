@@ -249,7 +249,7 @@ func (c *client) handleEvent(event string, args ...interface{}) {
 
 func (c *client) OnEvent(event string, handler EventHandler) {
 	if handlers, ok := c.eventHandlers[event]; ok {
-		handlers = append(handlers, handler)
+		c.eventHandlers[event] = append(handlers, handler)
 	} else {
 		c.eventHandlers[event] = []EventHandler{handler}
 	}
@@ -318,8 +318,11 @@ func (c *client) read(readChan chan *wrp.Message, errorChan chan error, closeCha
 
 // going to be used to access the HandleMessage() function
 func (c *client) readPump(readChan chan *wrp.Message, errorChan chan error, closeChan chan int) (err error) {
-	logging.Info(c).Log("Reading message...")
-	defer func() { logging.Warn(c).Log("Stopped reading messages") }()
+	logging.Info(c).Log(logging.MessageKey(), "Reading message...")
+	defer func() {
+		er := c.connection.Close()
+		logging.Warn(c).Log(logging.MessageKey(), "Stopped reading messages", "err", er)
+	}()
 
 	for {
 		err = c.read(readChan, errorChan, closeChan)
