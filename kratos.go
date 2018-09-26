@@ -284,8 +284,8 @@ type Error struct {
 }
 
 func createError(resp *http.Response, err error) *Error {
-
 	var msg Message
+	defer resp.Body.Close()
 	data, _ := ioutil.ReadAll(resp.Body)
 	json.Unmarshal(data, &msg)
 
