@@ -290,12 +290,13 @@ func createError(resp *http.Response, err error) *Error {
 	json.Unmarshal(data, &msg)
 
 	if msg.Message == "" {
-		msg.Message = http.StatusText(msg.Code)
 		switch resp.StatusCode {
 		case device.StatusDeviceDisconnected:
 			msg.Message = "ErrorDeviceBusy"
 		case device.StatusDeviceTimeout:
 			msg.Message = "ErrorTransactionsClosed/ErrorTransactionsAlreadyClosed/ErrorDeviceClosed"
+		default:
+			msg.Message = http.StatusText(msg.Code)
 		}
 	}
 
