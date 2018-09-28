@@ -84,7 +84,7 @@ func (m *mockClient) Hostname() string {
 	return arguments.String(0)
 }
 
-func (m *mockClient) OnEvent(event string, handler EventHandler) {
+func (m *mockClient) OnEvent(event Event, handler EventHandler) {
 	arguments := m.Called(event, handler)
 	arguments.Error(0)
 }
@@ -470,7 +470,7 @@ func TestControlLoop(t *testing.T) {
 		headerInfo:    nil,
 		connection:    fakeConn,
 		Logger:        logging.New(nil),
-		eventHandlers: make(map[string][]EventHandler),
+		eventHandlers: make(map[Event][]EventHandler),
 		done:          make(chan struct{}),
 	}
 	testClient.handlers[0].keyRegex, _ = regexp.Compile(testClient.handlers[0].HandlerKey)
@@ -484,7 +484,7 @@ func TestControlLoop(t *testing.T) {
 
 	// test ping
 	count := 0
-	testClient.OnEvent("ping", func(args ...interface{}) error {
+	testClient.OnEvent(Ping, func(args ...interface{}) error {
 		count++
 		return nil
 	})
@@ -498,11 +498,11 @@ func TestControlLoop(t *testing.T) {
 
 	// test pong
 	count = 0
-	testClient.OnEvent("pong", func(args ...interface{}) error {
+	testClient.OnEvent(Pong, func(args ...interface{}) error {
 		count++
 		return nil
 	})
-	testClient.OnEvent("pong", func(args ...interface{}) error {
+	testClient.OnEvent(Pong, func(args ...interface{}) error {
 		count++
 		return nil
 	})
@@ -516,7 +516,7 @@ func TestControlLoop(t *testing.T) {
 
 	// test read
 	count = 0
-	testClient.OnEvent("message", func(args ...interface{}) error {
+	testClient.OnEvent(Message, func(args ...interface{}) error {
 		count++
 		return nil
 	})
@@ -530,7 +530,7 @@ func TestControlLoop(t *testing.T) {
 
 	// test error
 	count = 0
-	testClient.OnEvent("error", func(args ...interface{}) error {
+	testClient.OnEvent(Error, func(args ...interface{}) error {
 		count++
 		return nil
 	})
@@ -545,7 +545,7 @@ func TestControlLoop(t *testing.T) {
 
 	// test error
 	count = 0
-	testClient.OnEvent("close", func(args ...interface{}) error {
+	testClient.OnEvent(Close, func(args ...interface{}) error {
 		count++
 		return nil
 	})
@@ -560,7 +560,7 @@ func TestControlLoop(t *testing.T) {
 
 	// test context
 	count = 0
-	testClient.OnEvent("done", func(args ...interface{}) error {
+	testClient.OnEvent(Done, func(args ...interface{}) error {
 		count++
 		return nil
 	})

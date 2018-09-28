@@ -16,6 +16,19 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+//go:generate stringer -type=Event
+type Event int
+
+const (
+	Error Event = iota + 1
+	Open
+	Ping
+	Pong
+	Close
+	Message
+	Done
+)
+
 const (
 	// Time allowed to write a message to the peer.
 	writeWait = time.Duration(10) * time.Second
@@ -37,7 +50,7 @@ type ClientFactory struct {
 	HandlePingMiss HandlePingMiss
 	ClientLogger   log.Logger
 
-	EventHandlers map[string][]EventHandler
+	EventHandlers map[Event][]EventHandler
 }
 
 // New is used to create a new kratos Client from a ClientFactory
@@ -148,7 +161,7 @@ func (pmh *pingMissHandler) checkPing(inTimer *time.Timer, pinged <-chan string,
 // Client is what function calls we expose to the user of kratos
 type Client interface {
 	Hostname() string
-	OnEvent(event string, handler EventHandler)
+	OnEvent(event Event, handler EventHandler)
 	Send(message interface{}) error
 	Close() error
 }
@@ -184,7 +197,7 @@ type client struct {
 	headerInfo      *clientHeader
 	log.Logger
 
-	eventHandlers map[string][]EventHandler
+	eventHandlers map[Event][]EventHandler
 	shutdownOnce  sync.Once
 	done          chan struct{}
 }
@@ -212,32 +225,32 @@ func (c *client) controlLoop(pingChan <-chan string,
 			// - reply with pong (needed when `SetPingHandler` is overwritten)
 			err := c.connection.WriteControl(websocket.PongMessage, []byte(pingData), time.Now().Add(writeWait))
 			if err != nil {
-				c.handleEvent("error", err)
+				c.handleEvent(Error, err)
 			}
-			c.handleEvent("ping")
+			c.handleEvent(Ping)
 		case pongData := <-pongChan:
-			c.handleEvent("pong", pongData)
+			c.handleEvent(Pong, pongData)
 		case wrpData := <-readDataChan:
 			for i := 0; i < len(c.handlers); i++ {
 				if c.handlers[i].keyRegex.MatchString(wrpData.Destination) {
 					c.handlers[i].Handler.HandleMessage(*wrpData)
 				}
 			}
-			c.handleEvent("message", wrpData)
+			c.handleEvent(Message, wrpData)
 		case readErr := <-readErrChan:
-			c.handleEvent("error", readErr)
+			c.handleEvent(Error, readErr)
 		case readClose := <-readCloseChan:
-			c.handleEvent("close", readClose)
+			c.handleEvent(Close, readClose)
 		case <-ctx.Done():
 			err = c.Close()
 		case <-c.done:
-			c.handleEvent("done")
+			c.handleEvent(Done)
 			return err
 		}
 	}
 }
 
-func (c *client) handleEvent(event string, args ...interface{}) {
+func (c *client) handleEvent(event Event, args ...interface{}) {
 	if handlers, ok := c.eventHandlers[event]; ok {
 		for _, handler := range handlers {
 			if err := handler(args...); err != nil {
@@ -247,7 +260,7 @@ func (c *client) handleEvent(event string, args ...interface{}) {
 	}
 }
 
-func (c *client) OnEvent(event string, handler EventHandler) {
+func (c *client) OnEvent(event Event, handler EventHandler) {
 	if handlers, ok := c.eventHandlers[event]; ok {
 		c.eventHandlers[event] = append(handlers, handler)
 	} else {
@@ -269,7 +282,7 @@ func (c *client) Send(message interface{}) (err error) {
 		err = c.connection.WriteMessage(websocket.BinaryMessage, buffer.Bytes())
 	}
 	if err != nil {
-		c.handleEvent("error", err)
+		c.handleEvent(Error, err)
 	}
 	return
 }
@@ -280,7 +293,7 @@ func (c *client) Close() (err error) {
 
 	c.shutdownOnce.Do(func() {
 		// trigger `close` event when the client closes the connection
-		c.handleEvent("close")
+		c.handleEvent(Close)
 		err = c.connection.Close()
 
 		// Stops the main control loop
@@ -365,6 +378,7 @@ func createConnection(headerInfo *clientHeader, httpURL string) (connection *web
 	if err != nil {
 		return nil, "", err
 	}
+
 
 	return connection, wsURL, nil
 }
