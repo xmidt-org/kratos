@@ -2,6 +2,9 @@ package kratos
 
 import (
 	"bytes"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"net/http"
 	"regexp"
 	"strings"
@@ -253,12 +256,56 @@ func createConnection(headerInfo *clientHeader, httpURL string) (connection *web
 		//Get url to which we are redirected and reconfigure it
 		wsURL = strings.Replace(resp.Header.Get("Location"), "http", "ws", 1)
 
-		connection, _, err = websocket.DefaultDialer.Dial(wsURL, headers)
+		connection, resp, err = websocket.DefaultDialer.Dial(wsURL, headers)
 	}
 
 	if err != nil {
+		if resp != nil {
+			err = createError(resp, err)
+		}
 		return nil, "", err
 	}
 
 	return connection, wsURL, nil
+}
+
+type Message struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
+
+func (msg Message) String() string {
+	return fmt.Sprintf("%d:%s", msg.Code, msg.Message)
+}
+
+type Error struct {
+	Message  Message
+	SubError error
+}
+
+func createError(resp *http.Response, err error) *Error {
+	var msg Message
+	defer resp.Body.Close()
+	data, _ := ioutil.ReadAll(resp.Body)
+	json.Unmarshal(data, &msg)
+
+	if msg.Message == "" {
+		switch resp.StatusCode {
+		case device.StatusDeviceDisconnected:
+			msg.Message = "ErrorDeviceBusy"
+		case device.StatusDeviceTimeout:
+			msg.Message = "ErrorTransactionsClosed/ErrorTransactionsAlreadyClosed/ErrorDeviceClosed"
+		default:
+			msg.Message = http.StatusText(msg.Code)
+		}
+	}
+
+	return &Error{
+		Message:  msg,
+		SubError: err,
+	}
+}
+
+func (e *Error) Error() string {
+	return fmt.Sprintf("message: %s with error: %s", e.Message, e.SubError.Error())
 }
