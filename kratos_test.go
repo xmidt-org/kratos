@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"github.com/Comcast/webpa-common/device"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -160,6 +162,34 @@ func TestMain(m *testing.M) {
 	goodMsg = buf.Bytes()
 
 	os.Exit(m.Run())
+}
+
+func TestErrorCreation(t *testing.T) {
+	assert := assert.New(t)
+	code := device.StatusDeviceDisconnected
+	msg := fmt.Sprintf("Could not process device request: %s", device.ErrorDeviceClosed)
+
+	brokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(code)
+		fmt.Fprintf(
+			w,
+			`{"code": %d, "message": "%s"}`,
+			code,
+			msg,
+		)
+
+	}))
+	defer brokenServer.Close()
+
+	testClientFactory.DestinationURL = brokenServer.URL
+	_, err := testClientFactory.New()
+
+	testClientFactory.DestinationURL = testServer.URL
+
+	assert.NotNil(err)
+	expected := fmt.Sprintf("message: %s with error: %s", ResponseMessage{code, msg}, websocket.ErrBadHandshake)
+	assert.Equal(expected, err.Error())
 }
 
 func TestNew(t *testing.T) {
