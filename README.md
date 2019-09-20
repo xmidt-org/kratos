@@ -1,8 +1,8 @@
 # kratos, the client emulator
 
-[![Build Status](https://travis-ci.org/Comcast/kratos.svg?branch=master)](https://travis-ci.org/Comcast/kratos)
-[![codecov.io](http://codecov.io/github/Comcast/kratos/coverage.svg?branch=master)](http://codecov.io/github/Comcast/kratos?branch=master)
-[![Go Report Card](https://goreportcard.com/badge/github.com/Comcast/kratos)](https://goreportcard.com/report/github.com/Comcast/kratos)
+[![Build Status](https://travis-ci.com/xmidt-org/kratos.svg?branch=master)](https://travis-ci.com/xmidt-org/kratos)
+[![codecov.io](http://codecov.io/github/xmidt-org/kratos/coverage.svg?branch=master)](http://codecov.io/github/xmidt-org/kratos?branch=master)
+[![Go Report Card](https://goreportcard.com/badge/github.com/xmidt-org/kratos)](https://goreportcard.com/report/github.com/xmidt-org/kratos)
 
 Websocket wrapper that provides a simple API for making new connections,
 sending messages on that connection, and providing a way to handle received
@@ -18,7 +18,7 @@ Below is a sample `glide.yaml` that you can use in conjunction with the instruct
 ```
 package: myProject
 import:
-- package: github.com/Comcast/kratos
+- package: github.com/xmidt-org/kratos
 ```
 
 ## Instructions for Building Sample `main.go` File:
@@ -46,7 +46,7 @@ $ glide install
 $
 $ # copy the main.go file included in kratos into <root>/myProject/src/myProject
 $ cd <root>/myProject/src/myProject
-$ cp <root>/myProject/src/myProject/vendor/github.com/Comcast/kratos/example/main.go .
+$ cp <root>/myProject/src/myProject/vendor/github.com/xmidt-org/kratos/example/main.go .
 $
 $ # run `glide up` so we can grab the stuff that `main.go` says it needs
 $ # these weren't grabbed initially by glide since glide didn't have any import

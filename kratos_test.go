@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/Comcast/webpa-common/device"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -13,11 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Comcast/webpa-common/logging"
-	"github.com/Comcast/webpa-common/wrp"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/xmidt-org/webpa-common/device"
+	"github.com/xmidt-org/webpa-common/logging"
+	"github.com/xmidt-org/wrp-go/wrp"
 )
 
 const (
@@ -155,7 +155,7 @@ func TestMain(m *testing.M) {
 
 func TestErrorCreation(t *testing.T) {
 	assert := assert.New(t)
-	code := device.StatusDeviceDisconnected
+	code := StatusDeviceDisconnected
 	msg := fmt.Sprintf("Could not process device request: %s", device.ErrorDeviceClosed)
 
 	brokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Comcast/webpa-common/device"
-	"github.com/Comcast/webpa-common/logging"
-	"github.com/Comcast/webpa-common/wrp"
 	"github.com/go-kit/kit/log"
 	"github.com/gorilla/websocket"
+	"github.com/xmidt-org/webpa-common/device"
+	"github.com/xmidt-org/webpa-common/logging"
+	"github.com/xmidt-org/wrp-go/wrp"
 )
 
 const (
@@ -23,6 +23,9 @@ const (
 
 	// Time allowed to wait in between pings
 	pingWait = time.Duration(60) * time.Second
+
+	StatusDeviceDisconnected int = 523
+	StatusDeviceTimeout      int = 524
 )
 
 // ClientFactory is used to generate a client by calling new on this type
@@ -291,9 +294,9 @@ func createError(resp *http.Response, err error) *Error {
 
 	if msg.Message == "" {
 		switch resp.StatusCode {
-		case device.StatusDeviceDisconnected:
+		case StatusDeviceDisconnected:
 			msg.Message = "ErrorDeviceBusy"
-		case device.StatusDeviceTimeout:
+		case StatusDeviceTimeout:
 			msg.Message = "ErrorTransactionsClosed/ErrorTransactionsAlreadyClosed/ErrorDeviceClosed"
 		default:
 			msg.Message = http.StatusText(msg.Code)
