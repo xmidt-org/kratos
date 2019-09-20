@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/Comcast/kratos"
-	"github.com/Comcast/webpa-common/logging"
-	"github.com/Comcast/webpa-common/wrp"
+	"github.com/xmidt-org/kratos"
+	"github.com/xmidt-org/webpa-common/logging"
+	"github.com/xmidt-org/wrp-go/wrp"
 )
 
 var (
