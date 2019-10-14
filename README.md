@@ -10,9 +10,24 @@ Websocket wrapper that provides a simple API for making new connections,
 sending messages on that connection, and providing a way to handle received
 messages.
 
+## Table of Contents
+
+- [Code of Conduct](#code-of-conduct)
+- [How to Install](#how-to-install)
+- [Contributing](#contributing)
+
+## Code of Conduct
+
+This project and everyone participating in it are governed by the [XMiDT Code Of Conduct](https://xmidt.io/code_of_conduct/). 
+By participating, you agree to this Code.
+
 ## How to Install
 This project uses go modules to manage its dependencies. This is best used with go 1.12+.  to import this module, run:
 ```
 go get github.com/xmidt-org/kratos@latest
 ```
 or add it to your go.mod file for your project.
+
+## Contributing
+
+Refer to [CONTRIBUTING.md](CONTRIBUTING.md).
