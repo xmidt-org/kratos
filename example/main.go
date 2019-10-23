@@ -35,7 +35,7 @@ func main() {
 		FirmwareName:   "TG1682_2.1p7s1_PROD_sey",
 		ModelName:      "TG1682G",
 		Manufacturer:   "ARRIS Group, Inc.",
-		DestinationURL: "https://fabric-cd.webpa.comcast.net:8080/api/v2/device",
+		DestinationURL: "http://localhost:6200/api/v2/device",
 		Handlers: []kratos.HandlerRegistry{
 			{
 				HandlerKey: "/foo",
