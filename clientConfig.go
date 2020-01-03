@@ -83,7 +83,7 @@ func NewClient(config ClientConfig) (Client, error) {
 	}
 
 	sender := NewSender(newConnection, config.OutboundQueue.MaxWorkers, config.OutboundQueue.Size, logger)
-	encoder := NewEncoder(sender, config.WRPEncoderQueue.MaxWorkers, config.WRPEncoderQueue.Size, logger)
+	encoder := NewEncoderSender(sender, config.WRPEncoderQueue.MaxWorkers, config.WRPEncoderQueue.Size, logger)
 
 	newClient := &client{
 		deviceID:        inHeader.deviceName,
@@ -105,7 +105,7 @@ func NewClient(config ClientConfig) (Client, error) {
 
 	downstreamSender := NewDownstreamSender(newClient.Send, config.HandleMsgQueue.MaxWorkers, config.HandleMsgQueue.Size, logger)
 	registryHandler := NewRegistryHandler(newClient.Send, newClient.registry, downstreamSender, config.HandlerRegistryQueue.MaxWorkers, config.HandlerRegistryQueue.Size, newClient.deviceID, logger)
-	decoder := NewDecoder(registryHandler, config.WRPDecoderQueue.MaxWorkers, config.WRPDecoderQueue.Size, logger)
+	decoder := NewDecoderSender(registryHandler, config.WRPDecoderQueue.MaxWorkers, config.WRPDecoderQueue.Size, logger)
 	newClient.decoderSender = decoder
 
 	pingTimer := time.NewTimer(pingWait)

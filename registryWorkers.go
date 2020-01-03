@@ -11,11 +11,16 @@ import (
 	"github.com/xmidt-org/wrp-go/wrp"
 )
 
+// registryHandler is a way to send the wrp message to the correct handler.
 type registryHandler interface {
 	GetHandlerThenSend(*wrp.Message)
 	Close()
 }
 
+// registryQueue provides a way to use the HandlerRegistry in an asynchronous
+// fashion.  The registryQueue gets the handler for the wrp message from the
+// handler registry, and then calls on the downstreamSender to send the message
+// to that handler.
 type registryQueue struct {
 	incoming         chan *wrp.Message
 	registry         HandlerRegistry
@@ -27,6 +32,8 @@ type registryQueue struct {
 	logger           log.Logger
 }
 
+// NewRegistryHandler returns a registryHandler, which sends wrp messages to
+// the correct handler in an asynchronous fashion.
 func NewRegistryHandler(senderFunc sendWRPFunc, registry HandlerRegistry, downstreamSender downstreamSender, maxWorkers int, queueSize int, deviceID string, logger log.Logger) *registryQueue {
 	size := queueSize
 	if size < minQueueSize {
@@ -50,10 +57,14 @@ func NewRegistryHandler(senderFunc sendWRPFunc, registry HandlerRegistry, downst
 	return &r
 }
 
+// GetHandlerThenSend adds the message to the queue, so it can be handled when
+// there are appropriate resources.
 func (r *registryQueue) GetHandlerThenSend(msg *wrp.Message) {
 	r.incoming <- msg
 }
 
+// Close is a graceful shutdown of the registryQueue: first getting handlers and
+// sending the currently held events, then closing the downstreamSender.
 func (r *registryQueue) Close() {
 	close(r.incoming)
 	r.wg.Wait()
@@ -61,6 +72,9 @@ func (r *registryQueue) Close() {
 	r.downstreamSender.Close()
 }
 
+// startGettingHandlers is called when the registryQueue starts, enabling the
+// registryQueue to read from its queue, get the appropriate handler for the
+// given message, and send it using the downstreamSender.
 func (r *registryQueue) startGettingHandlers() {
 	defer r.wg.Done()
 	for i := range r.incoming {
@@ -70,6 +84,8 @@ func (r *registryQueue) startGettingHandlers() {
 	}
 }
 
+// getHandler provides a way to get the handler from the registry and then send
+// the message.
 func (r *registryQueue) getHandler(msg *wrp.Message) {
 	defer r.wg.Done()
 	defer r.workers.Release()
