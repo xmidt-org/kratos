@@ -17,6 +17,7 @@ type Client interface {
 	Close() error
 }
 
+// sendWRPFunc is the function for sending a message downstream.
 type sendWRPFunc func(*wrp.Message)
 
 type client struct {
@@ -43,26 +44,29 @@ type clientHeader struct {
 	manufacturer string
 }
 
+// websocketConnection maintains the websocket connection upstream (to XMiDT).
 type websocketConnection interface {
 	WriteMessage(messageType int, data []byte) error
 	ReadMessage() (messageType int, p []byte, err error)
 	Close() error
 }
 
+// Hostname provides the client's hostname.
 func (c *client) Hostname() string {
 	return c.hostname
 }
 
+// HandlerRegistry returns the HandlerRegistry that the client maintains.
 func (c *client) HandlerRegistry() HandlerRegistry {
 	return c.registry
 }
 
-// used to open a channel for writing to XMiDT
+// Send is used to open a channel for writing to XMiDT
 func (c *client) Send(message *wrp.Message) {
 	c.encoderSender.EncodeAndSend(message)
 }
 
-// will close the connection to the server
+// Close closes connections downstream and the socket upstream.
 func (c *client) Close() error {
 	logging.Info(c.logger).Log(logging.MessageKey(), "Closing client...")
 	close(c.done)
