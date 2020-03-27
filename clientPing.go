@@ -27,6 +27,15 @@ func (c *client) checkPing(inTimer *time.Timer, pinged <-chan string) {
 		case <-c.done:
 			logging.Info(c.logger).Log(logging.MessageKey(), "Stopped waiting for pings")
 			return
+			// if we get a ping, make sure to reset the timer until the next ping.
+		case <-pinged:
+			count = 0
+			if !inTimer.Stop() {
+				<-inTimer.C
+			}
+			logging.Debug(c.logger).Log(logging.MessageKey(), "Received a ping. Resetting ping timer")
+			inTimer.Reset(c.pingConfig.PingWait)
+
 		// if we hit the timer, we've missed a ping.
 		case <-inTimer.C:
 			logging.Error(c.logger).Log(logging.MessageKey(), "Ping miss, calling handler", "count", count)
@@ -40,14 +49,6 @@ func (c *client) checkPing(inTimer *time.Timer, pinged <-chan string) {
 				pingMiss = true
 			}
 			logging.Debug(c.logger).Log(logging.MessageKey(), "Resetting ping timer")
-			inTimer.Reset(c.pingConfig.PingWait)
-		// if we get a ping, make sure to reset the timer until the next ping.
-		case <-pinged:
-			count = 0
-			if !inTimer.Stop() {
-				<-inTimer.C
-			}
-			logging.Debug(c.logger).Log(logging.MessageKey(), "Received a ping. Resetting ping timer")
 			inTimer.Reset(c.pingConfig.PingWait)
 		}
 	}
