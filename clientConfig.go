@@ -36,12 +36,18 @@ type ClientConfig struct {
 	Handlers             []HandlerConfig
 	HandlePingMiss       HandlePingMiss
 	ClientLogger         log.Logger
+	PingConfig           PingConfig
 }
 
 // QueueConfig is used to configure all the queues used to make kratos asynchronous.
 type QueueConfig struct {
 	MaxWorkers int
 	Size       int
+}
+
+type PingConfig struct {
+	PingWait    time.Duration
+	MaxPingMiss int
 }
 
 // NewClient is used to create a new kratos Client from a ClientConfig.
@@ -81,6 +87,12 @@ func NewClient(config ClientConfig) (Client, error) {
 	} else {
 		logger = logging.DefaultLogger()
 	}
+	if config.PingConfig.MaxPingMiss <= 0 {
+		config.PingConfig.MaxPingMiss = 3
+	}
+	if config.PingConfig.PingWait == 0 {
+		config.PingConfig.PingWait = time.Minute
+	}
 
 	sender := NewSender(newConnection, config.OutboundQueue.MaxWorkers, config.OutboundQueue.Size, logger)
 	encoder := NewEncoderSender(sender, config.WRPEncoderQueue.MaxWorkers, config.WRPEncoderQueue.Size, logger)
@@ -96,6 +108,7 @@ func NewClient(config ClientConfig) (Client, error) {
 		headerInfo:      inHeader,
 		done:            make(chan struct{}, 1),
 		logger:          logger,
+		pingConfig:      config.PingConfig,
 	}
 
 	newClient.registry, err = NewHandlerRegistry(config.Handlers)
@@ -108,7 +121,7 @@ func NewClient(config ClientConfig) (Client, error) {
 	decoder := NewDecoderSender(registryHandler, config.WRPDecoderQueue.MaxWorkers, config.WRPDecoderQueue.Size, logger)
 	newClient.decoderSender = decoder
 
-	pingTimer := time.NewTimer(pingWait)
+	pingTimer := time.NewTimer(newClient.pingConfig.PingWait)
 
 	newClient.wg.Add(2)
 	go newClient.checkPing(pingTimer, pinged)
@@ -133,14 +146,14 @@ func createConnection(headerInfo *clientHeader, httpURL string) (connection *web
 	headers.Add("X-Webpa-Model-Name", headerInfo.modelName)
 	headers.Add("X-Webpa-Manufacturer", headerInfo.manufacturer)
 
-	//make sure destUrl's protocol is websocket (ws)
+	// make sure destUrl's protocol is websocket (ws)
 	wsURL = strings.Replace(httpURL, "http", "ws", 1)
 
 	// creates a new client connection given the URL string
 	connection, resp, err := websocket.DefaultDialer.Dial(wsURL, headers)
 
 	if err == websocket.ErrBadHandshake && resp.StatusCode == http.StatusTemporaryRedirect {
-		//Get url to which we are redirected and reconfigure it
+		// Get url to which we are redirected and reconfigure it
 		wsURL = strings.Replace(resp.Header.Get("Location"), "http", "ws", 1)
 
 		connection, resp, err = websocket.DefaultDialer.Dial(wsURL, headers)
