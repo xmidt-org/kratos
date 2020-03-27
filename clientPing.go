@@ -9,6 +9,7 @@ import (
 const (
 	// Time allowed to wait in between pings
 	pingWait = time.Duration(60) * time.Second
+	maxPingMisses = 3
 )
 
 // HandlePingMiss is a function called when we run into situations where we're
@@ -24,7 +25,7 @@ func (c *client) checkPing(inTimer *time.Timer, pinged <-chan string) {
 	// pingMiss indicates that a ping has been missed.
 	pingMiss := false
 	logging.Info(c.logger).Log(logging.MessageKey(), "Watching socket for pings")
-
+	count := int64(0)
 	// as long as we're getting pings, we continue to loop.
 	for !pingMiss {
 		select {
@@ -34,16 +35,20 @@ func (c *client) checkPing(inTimer *time.Timer, pinged <-chan string) {
 			return
 		// if we hit the timer, we've missed a ping.
 		case <-inTimer.C:
-			logging.Error(c.logger).Log(logging.MessageKey(), "Ping miss, calling handler")
-			pingMiss = true
+			logging.Error(c.logger).Log(logging.MessageKey(), "Ping miss, calling handler", "count", count)
 			err := c.handlePingMiss()
 			if err != nil {
 				logging.Info(c.logger).Log(logging.MessageKey(), "Error handling ping miss:", logging.ErrorKey(), err)
+			}
+			if count >= maxPingMisses{
+				logging.Error(c.logger).Log(logging.MessageKey(), "Ping miss, exiting ping loop")
+				pingMiss = true
 			}
 			logging.Debug(c.logger).Log(logging.MessageKey(), "Resetting ping timer")
 			inTimer.Reset(pingWait)
 		// if we get a ping, make sure to reset the timer until the next ping.
 		case <-pinged:
+			count = 0
 			if !inTimer.Stop() {
 				<-inTimer.C
 			}
