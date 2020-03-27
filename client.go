@@ -1,12 +1,11 @@
 package kratos
 
 import (
-	"sync"
-
 	"github.com/go-kit/kit/log"
 	"github.com/goph/emperror"
 	"github.com/xmidt-org/webpa-common/logging"
 	"github.com/xmidt-org/wrp-go/wrp"
+	"sync"
 )
 
 // Client is what function calls we expose to the user of kratos
@@ -34,6 +33,7 @@ type client struct {
 	logger          log.Logger
 	done            chan struct{}
 	wg              sync.WaitGroup
+	pingConfig      PingConfig
 }
 
 // used to track everything that we want to know about the client headers
