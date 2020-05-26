@@ -122,6 +122,4 @@ func (c *client) read() {
 			logging.Debug(c.logger).Log(logging.MessageKey(), "Message sent to be decoded")
 		}
 	}
-
-	return
 }

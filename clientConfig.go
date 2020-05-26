@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/goph/emperror"
 	"github.com/gorilla/websocket"
 	"github.com/xmidt-org/webpa-common/device"
 	"github.com/xmidt-org/webpa-common/logging"
@@ -78,7 +79,7 @@ func NewClient(config ClientConfig) (Client, error) {
 	newConnection, connectionURL, err := createConnection(inHeader, config.DestinationURL)
 
 	if err != nil {
-		return nil, err
+		return nil, emperror.Wrap(err, "couldn't create connection")
 	}
 
 	pinged := make(chan string)
@@ -99,7 +100,10 @@ func NewClient(config ClientConfig) (Client, error) {
 		logger = logging.DefaultLogger()
 	}
 
-	sender := NewSender(newConnection, config.OutboundQueue.MaxWorkers, config.OutboundQueue.Size, logger)
+	sender, err := NewSender(newConnection, config.OutboundQueue.MaxWorkers, config.OutboundQueue.Size, logger)
+	if err != nil {
+		return nil, emperror.Wrap(err, "couldn't create new sender")
+	}
 	encoder := NewEncoderSender(sender, config.WRPEncoderQueue.MaxWorkers, config.WRPEncoderQueue.Size, logger)
 
 	newClient := &client{

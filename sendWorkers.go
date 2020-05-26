@@ -18,6 +18,7 @@
 package kratos
 
 import (
+	"errors"
 	"sync"
 
 	"github.com/go-kit/kit/log"
@@ -25,6 +26,10 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/xmidt-org/webpa-common/logging"
 	"github.com/xmidt-org/webpa-common/semaphore"
+)
+
+var (
+	ErrNilConnection = errors.New("websocketConnection is nil")
 )
 
 // outboundSender provides a way to send wrps.
@@ -45,7 +50,11 @@ type senderQueue struct {
 
 // NewSender creates a new senderQueue with the given websocketConnection and
 // other configuration.
-func NewSender(connection websocketConnection, maxWorkers int, queueSize int, logger log.Logger) *senderQueue {
+func NewSender(connection websocketConnection, maxWorkers int, queueSize int, logger log.Logger) (*senderQueue, error) {
+	if connection == nil {
+		return nil, ErrNilConnection
+	}
+
 	size := queueSize
 	if size < minQueueSize {
 		size = minQueueSize
@@ -62,7 +71,7 @@ func NewSender(connection websocketConnection, maxWorkers int, queueSize int, lo
 	}
 	s.wg.Add(1)
 	go s.startSending()
-	return &s
+	return &s, nil
 }
 
 // Send adds the message given to the queue of messages to be sent.
