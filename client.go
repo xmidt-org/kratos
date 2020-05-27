@@ -1,11 +1,12 @@
 package kratos
 
 import (
+	"sync"
+
 	"github.com/go-kit/kit/log"
 	"github.com/goph/emperror"
 	"github.com/xmidt-org/webpa-common/logging"
 	"github.com/xmidt-org/wrp-go/wrp"
-	"sync"
 )
 
 // Client is what function calls we expose to the user of kratos
@@ -97,8 +98,8 @@ func (c *client) read() {
 			_, serverMessage, err := c.connection.ReadMessage()
 			if err != nil {
 				logging.Error(c.logger, emperror.Context(err)...).
-					Log(logging.MessageKey(), "Failed to read message", logging.ErrorKey(), err.Error())
-				continue
+					Log(logging.MessageKey(), "Failed to read message. Exiting out of read loop.", logging.ErrorKey(), err.Error())
+				break
 			}
 			c.decoderSender.DecodeAndSend(serverMessage)
 
