@@ -2,6 +2,7 @@ package kratos
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"github.com/go-kit/kit/log"
 	"github.com/xmidt-org/webpa-common/logging"
@@ -30,6 +31,8 @@ type downstreamSenderQueue struct {
 	workers  semaphore.Interface
 	wg       sync.WaitGroup
 	logger   log.Logger
+	once     sync.Once
+	closed   atomic.Value
 }
 
 // NewDownstreamSender creates a new downstreamSenderQueue for asynchronously
@@ -58,14 +61,23 @@ func NewDownstreamSender(senderFunc sendWRPFunc, maxWorkers int, queueSize int, 
 // messages to be sent.  It will block if the queue is full.  This should not
 // be called after Close().
 func (d *downstreamSenderQueue) Send(handler DownstreamHandler, msg *wrp.Message) {
-	d.incoming <- sendInfo{handler: handler, msg: msg}
+	switch d.closed.Load() {
+	case true:
+		logging.Error(d.logger).Log(logging.MessageKey(),
+			"Failed to queue message. DownstreamSenderQueue is no longer accepting messages.")
+	default:
+		d.incoming <- sendInfo{handler: handler, msg: msg}
+	}
 }
 
 // Close closes the queue channel and then blocks until all remaining messages
 // have been sent.
 func (d *downstreamSenderQueue) Close() {
-	close(d.incoming)
-	d.wg.Wait()
+	d.once.Do(func() {
+		d.closed.Store(true)
+		close(d.incoming)
+		d.wg.Wait()
+	})
 }
 
 // startSending is called when the downstreamSenderQueue is created.  It is a

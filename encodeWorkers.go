@@ -3,6 +3,7 @@ package kratos
 import (
 	"bytes"
 	"sync"
+	"sync/atomic"
 
 	"github.com/go-kit/kit/log"
 	"github.com/goph/emperror"
@@ -24,6 +25,8 @@ type encoderQueue struct {
 	workers  semaphore.Interface
 	wg       sync.WaitGroup
 	logger   log.Logger
+	once     sync.Once
+	closed   atomic.Value
 }
 
 // NewEncoderSender creates a new encoderQueue, that allows for asynchronous
@@ -50,16 +53,26 @@ func NewEncoderSender(sender outboundSender, maxWorkers int, queueSize int, logg
 
 // EncodeAndSend adds the message to the queue to be sent.  It will block if
 // the queue is full.  This should not be called after Close().
+//TODO: we should consider returning an error in the case in which we can no longer encode
 func (e *encoderQueue) EncodeAndSend(msg *wrp.Message) {
-	e.incoming <- msg
+	switch e.closed.Load() {
+	case true:
+		logging.Error(e.logger).Log(logging.MessageKey(),
+			"Failed to queue message. EncoderQueue is no longer accepting messages.")
+	default:
+		e.incoming <- msg
+	}
 }
 
 // Close closes the queue, not allowing any more messages to be sent.  Then
 // it will block until all the messages in the queue have been sent.
 func (e *encoderQueue) Close() {
-	close(e.incoming)
-	e.wg.Wait()
-	e.sender.Close()
+	e.once.Do(func() {
+		e.closed.Store(true)
+		close(e.incoming)
+		e.wg.Wait()
+		e.sender.Close()
+	})
 }
 
 // startParsing is called when the encoderQueue is created.  It is a

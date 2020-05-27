@@ -2,6 +2,7 @@ package kratos
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"github.com/go-kit/kit/log"
 	"github.com/goph/emperror"
@@ -24,6 +25,8 @@ type senderQueue struct {
 	workers    semaphore.Interface
 	wg         sync.WaitGroup
 	logger     log.Logger
+	once       sync.Once
+	closed     atomic.Value
 }
 
 // NewSender creates a new senderQueue with the given websocketConnection and
@@ -50,14 +53,23 @@ func NewSender(connection websocketConnection, maxWorkers int, queueSize int, lo
 
 // Send adds the message given to the queue of messages to be sent.
 func (s *senderQueue) Send(msg []byte) {
-	s.incoming <- msg
+	switch s.closed.Load() {
+	case true:
+		logging.Error(s.logger).Log(logging.MessageKey(),
+			"Failed to queue message. SenderWorker is no longer accepting messages.")
+	default:
+		s.incoming <- msg
+	}
 }
 
 // Close provides a way to gracefully stop the senderQueue.  It stops receiving
 // any new messages to send and then waits until all messages have been sent.
 func (s *senderQueue) Close() {
-	close(s.incoming)
-	s.wg.Wait()
+	s.once.Do(func() {
+		s.closed.Store(true)
+		close(s.incoming)
+		s.wg.Wait()
+	})
 }
 
 // startSending is called when the senderQueue is created, allowing the queue

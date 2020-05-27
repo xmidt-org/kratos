@@ -35,6 +35,7 @@ type client struct {
 	done            chan struct{}
 	wg              sync.WaitGroup
 	pingConfig      PingConfig
+	once            sync.Once
 }
 
 // used to track everything that we want to know about the client headers
@@ -69,16 +70,20 @@ func (c *client) Send(message *wrp.Message) {
 
 // Close closes connections downstream and the socket upstream.
 func (c *client) Close() error {
-	logging.Info(c.logger).Log(logging.MessageKey(), "Closing client...")
-	close(c.done)
-	c.wg.Wait()
-	c.decoderSender.Close()
-	c.encoderSender.Close()
-	err := c.connection.Close()
-	if err != nil {
-		return emperror.Wrap(err, "Failed to close connection")
-	}
-	logging.Info(c.logger).Log(logging.MessageKey(), "Client Closed")
+	c.once.Do(func() {
+		logging.Info(c.logger).Log(logging.MessageKey(), "Closing client...")
+		close(c.done)
+		c.wg.Wait()
+		c.decoderSender.Close()
+		c.encoderSender.Close()
+		_ = c.connection.Close()
+		c.connection = nil
+		//TODO: if this fails, can we really do anything. Is there potential for leaks?
+		// if err != nil {
+		// 	return emperror.Wrap(err, "Failed to close connection")
+		// }
+		logging.Info(c.logger).Log(logging.MessageKey(), "Client Closed")
+	})
 	return nil
 }
 

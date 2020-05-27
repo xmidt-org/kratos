@@ -2,6 +2,7 @@ package kratos
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"github.com/go-kit/kit/log"
 	"github.com/goph/emperror"
@@ -29,6 +30,8 @@ type decoderQueue struct {
 	workers  semaphore.Interface
 	wg       sync.WaitGroup
 	logger   log.Logger
+	once     sync.Once
+	closed   atomic.Value
 }
 
 // NewDecoderSender creates a new decoderQueue for decoding and sending
@@ -56,15 +59,23 @@ func NewDecoderSender(sender registryHandler, maxWorkers int, queueSize int, log
 // DecodeAndSend places the message on the queue.  This will block when the
 // queue is full.  This should not be called after Close().
 func (d *decoderQueue) DecodeAndSend(msg []byte) {
-	d.incoming <- msg
+	switch d.closed.Load() {
+	case true:
+		logging.Error(d.logger).Log(logging.MessageKey(),
+			"Failed to queue message. DecoderQueue is no longer accepting messages.")
+	default:
+		d.incoming <- msg
+	}
 }
 
 // Close stops consumers from being able to add new messages to be decoded.
 // Then it blocks until all messages have been decoded and sent.
 func (d *decoderQueue) Close() {
-	close(d.incoming)
-	d.wg.Wait()
-	d.sender.Close()
+	d.once.Do(func() {
+		close(d.incoming)
+		d.wg.Wait()
+		d.sender.Close()
+	})
 }
 
 // startParsing is called when the decoderQueue is created.  It is a
