@@ -15,6 +15,9 @@ import (
 const (
 	// Time allowed to write a message to the peer.
 	writeWait = time.Duration(10) * time.Second
+
+	// Time allowed to read the next pong message from the peer.
+	pongWait = 60 * time.Second
 )
 
 var (
@@ -125,6 +128,9 @@ func NewClient(config ClientConfig) (Client, error) {
 
 	newClient.wg.Add(2)
 	go newClient.checkPing(pingTimer, pinged)
+
+	newConnection.SetReadDeadline(time.Now().Add(pongWait))
+	newConnection.SetPongHandler(func(string) error { newConnection.SetReadDeadline(time.Now().Add(pongWait)); return nil })
 	go newClient.read()
 
 	return newClient, nil

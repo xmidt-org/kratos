@@ -1,8 +1,10 @@
 package kratos
 
 import (
+	"fmt"
 	"net/http"
 	"sync"
+	"sync/atomic"
 
 	"github.com/go-kit/kit/log"
 	"github.com/goph/emperror"
@@ -30,6 +32,8 @@ type registryQueue struct {
 	workers          semaphore.Interface
 	wg               sync.WaitGroup
 	logger           log.Logger
+	once             sync.Once
+	closed           atomic.Value
 }
 
 // NewRegistryHandler returns a registryHandler, which sends wrp messages to
@@ -60,16 +64,24 @@ func NewRegistryHandler(senderFunc sendWRPFunc, registry HandlerRegistry, downst
 // GetHandlerThenSend adds the message to the queue, so it can be handled when
 // there are appropriate resources.
 func (r *registryQueue) GetHandlerThenSend(msg *wrp.Message) {
-	r.incoming <- msg
+	switch r.closed.Load() {
+	case true:
+		fmt.Println("d")
+	default:
+		r.incoming <- msg
+	}
 }
 
 // Close is a graceful shutdown of the registryQueue: first getting handlers and
 // sending the currently held events, then closing the downstreamSender.
 func (r *registryQueue) Close() {
-	close(r.incoming)
-	r.wg.Wait()
-	r.registry.Close()
-	r.downstreamSender.Close()
+	r.once.Do(func() {
+		r.closed.Store(true)
+		close(r.incoming)
+		r.wg.Wait()
+		r.registry.Close()
+		r.downstreamSender.Close()
+	})
 }
 
 // startGettingHandlers is called when the registryQueue starts, enabling the

@@ -104,13 +104,11 @@ func (c *client) read() {
 			if err != nil {
 				logging.Error(c.logger, emperror.Context(err)...).
 					Log(logging.MessageKey(), "Failed to read message. Exiting out of read loop.", logging.ErrorKey(), err.Error())
-				break
+				return
 			}
 			c.decoderSender.DecodeAndSend(serverMessage)
 
 			logging.Debug(c.logger).Log(logging.MessageKey(), "Message sent to be decoded")
 		}
 	}
-
-	return
 }
