@@ -91,7 +91,7 @@ func NewClient(config ClientConfig) (Client, error) {
 		logger = logging.DefaultLogger()
 	}
 	if config.PingConfig.MaxPingMiss <= 0 {
-		config.PingConfig.MaxPingMiss = 3
+		config.PingConfig.MaxPingMiss = 1
 	}
 	if config.PingConfig.PingWait == 0 {
 		config.PingConfig.PingWait = time.Minute
@@ -129,8 +129,8 @@ func NewClient(config ClientConfig) (Client, error) {
 	newClient.wg.Add(2)
 	go newClient.checkPing(pingTimer, pinged)
 
-	newConnection.SetReadDeadline(time.Now().Add(pongWait))
-	newConnection.SetPongHandler(func(string) error { newConnection.SetReadDeadline(time.Now().Add(pongWait)); return nil })
+	// newConnection.SetReadDeadline(time.Now().Add(pongWait))
+	// newConnection.SetPongHandler(func(string) error { newConnection.SetReadDeadline(time.Now().Add(pongWait)); return nil })
 	go newClient.read()
 
 	return newClient, nil
