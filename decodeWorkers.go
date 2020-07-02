@@ -72,6 +72,7 @@ func (d *decoderQueue) DecodeAndSend(msg []byte) {
 // Then it blocks until all messages have been decoded and sent.
 func (d *decoderQueue) Close() {
 	d.once.Do(func() {
+		d.closed.Store(true)
 		close(d.incoming)
 		d.wg.Wait()
 		d.sender.Close()
