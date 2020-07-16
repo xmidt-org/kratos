@@ -128,9 +128,6 @@ func NewClient(config ClientConfig) (Client, error) {
 
 	newClient.wg.Add(2)
 	go newClient.checkPing(pingTimer, pinged)
-
-	// newConnection.SetReadDeadline(time.Now().Add(pongWait))
-	// newConnection.SetPongHandler(func(string) error { newConnection.SetReadDeadline(time.Now().Add(pongWait)); return nil })
 	go newClient.read()
 
 	return newClient, nil
