@@ -10,7 +10,7 @@ import (
 	"github.com/goph/emperror"
 	"github.com/xmidt-org/webpa-common/logging"
 	"github.com/xmidt-org/webpa-common/semaphore"
-	"github.com/xmidt-org/wrp-go/wrp"
+	"github.com/xmidt-org/wrp-go/v3"
 )
 
 // registryHandler is a way to send the wrp message to the correct handler.
@@ -125,5 +125,4 @@ func (r *registryQueue) getHandler(msg *wrp.Message) {
 	r.downstreamSender.Send(handler, msg)
 
 	logging.Debug(r.logger).Log(logging.MessageKey(), "Sent message to handler")
-
 }

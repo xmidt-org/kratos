@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/xmidt-org/wrp-go/wrp"
+	"github.com/xmidt-org/wrp-go/v3"
 )
 
 const (

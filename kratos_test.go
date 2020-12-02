@@ -4,20 +4,18 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
-	"os"
-	"regexp"
-	"sync"
-	"testing"
-	"time"
-
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/xmidt-org/webpa-common/device"
+	"github.com/stretchr/testify/require"
 	"github.com/xmidt-org/webpa-common/logging"
-	"github.com/xmidt-org/wrp-go/wrp"
+	"github.com/xmidt-org/wrp-go/v3"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"sync"
+	"testing"
+	"time"
 )
 
 const (
@@ -25,17 +23,26 @@ const (
 )
 
 var (
+	simpleQueueConfig = QueueConfig{
+		MaxWorkers: 10,
+		Size:       10,
+	}
 	// handlerCalled is true and used for synchronization, true meaning that
 	// we don't need to worry about synchronization (mainly for calls to TestRead)
-	testClientFactory = &ClientFactory{
-		DeviceName:     "mac:ffffff112233",
-		FirmwareName:   "TG1682_2.1p7s1_PROD_sey",
-		ModelName:      "TG1682G",
-		Manufacturer:   "ARRIS Group, Inc.",
-		DestinationURL: "",
-		Handlers: []HandlerRegistry{
+	clientConfig = ClientConfig{
+		DeviceName:           "mac:ffffff112233",
+		FirmwareName:         "TG1682_2.1p7s1_PROD_sey",
+		ModelName:            "TG1682G",
+		Manufacturer:         "ARRIS Group, Inc.",
+		DestinationURL:       "",
+		OutboundQueue:        simpleQueueConfig,
+		WRPEncoderQueue:      simpleQueueConfig,
+		WRPDecoderQueue:      simpleQueueConfig,
+		HandlerRegistryQueue: simpleQueueConfig,
+		HandleMsgQueue:       simpleQueueConfig,
+		Handlers: []HandlerConfig{
 			{
-				HandlerKey: "/foo",
+				Regexp: "/foo",
 				Handler: &myReadHandler{
 					helloMsg:      "Hello.",
 					goodbyeMsg:    "I am Kratos.",
@@ -43,7 +50,7 @@ var (
 				},
 			},
 			{
-				HandlerKey: "/bar",
+				Regexp: "/bar",
 				Handler: &myReadHandler{
 					helloMsg:      "Whaddup.",
 					goodbyeMsg:    "It's dat boi Kratos.",
@@ -51,7 +58,7 @@ var (
 				},
 			},
 			{
-				HandlerKey: "/.*",
+				Regexp: "/.*",
 				Handler: &myReadHandler{
 					helloMsg:      "Hey.",
 					goodbyeMsg:    "Have you met Kratos?",
@@ -59,6 +66,12 @@ var (
 				},
 			},
 		},
+		HandlePingMiss: func() error {
+			fmt.Println("hi")
+			return nil
+		},
+		ClientLogger: nil,
+		PingConfig:   PingConfig{},
 	}
 
 	testServer *httptest.Server
@@ -122,11 +135,15 @@ type myReadHandler struct {
 	handlerCalled bool
 }
 
-func (m *myReadHandler) HandleMessage(msg interface{}) {
+func (m *myReadHandler) HandleMessage(msg *wrp.Message) *wrp.Message {
 	if !m.handlerCalled {
 		mainWG.Done()
 		m.handlerCalled = true
 	}
+	return msg
+}
+
+func (m *myReadHandler) Close() {
 }
 
 func TestMain(m *testing.M) {
@@ -135,7 +152,7 @@ func TestMain(m *testing.M) {
 	}))
 	defer testServer.Close()
 
-	testClientFactory.DestinationURL = testServer.URL
+	clientConfig.DestinationURL = testServer.URL
 
 	wrpMsg := wrp.SimpleRequestResponse{
 		Source:          "mac:ffffff112233/emu",
@@ -156,7 +173,7 @@ func TestMain(m *testing.M) {
 func TestErrorCreation(t *testing.T) {
 	assert := assert.New(t)
 	code := StatusDeviceDisconnected
-	msg := fmt.Sprintf("Could not process device request: %s", device.ErrorDeviceClosed)
+	msg := "ErrorDeviceBusy"
 
 	brokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -167,14 +184,13 @@ func TestErrorCreation(t *testing.T) {
 			code,
 			msg,
 		)
-
 	}))
 	defer brokenServer.Close()
 
-	testClientFactory.DestinationURL = brokenServer.URL
-	_, err := testClientFactory.New()
+	clientConfig.DestinationURL = brokenServer.URL
+	_, err := NewClient(clientConfig)
 
-	testClientFactory.DestinationURL = testServer.URL
+	clientConfig.DestinationURL = testServer.URL
 
 	assert.NotNil(err)
 	expected := fmt.Sprintf("message: %s with error: %s", Message{code, msg}, websocket.ErrBadHandshake)
@@ -183,7 +199,9 @@ func TestErrorCreation(t *testing.T) {
 
 func TestNew(t *testing.T) {
 	assert := assert.New(t)
-	testClient, err := testClientFactory.New()
+	require := require.New(t)
+	testClient, err := NewClient(clientConfig)
+	require.NoError(err)
 
 	assert.Equal("127.0.0.1", testClient.Hostname())
 	assert.Nil(err)
@@ -191,21 +209,21 @@ func TestNew(t *testing.T) {
 
 func TestNewBrokenMAC(t *testing.T) {
 	assert := assert.New(t)
-	goodMac := testClientFactory.DeviceName
-	testClientFactory.DeviceName = "broken:mac"
-	_, err := testClientFactory.New()
+	goodMac := clientConfig.DeviceName
+	clientConfig.DeviceName = "broken:mac"
+	_, err := NewClient(clientConfig)
 
-	testClientFactory.DeviceName = goodMac
+	clientConfig.DeviceName = goodMac
 	assert.NotNil(err)
 }
 
 func TestNewBrokenURL(t *testing.T) {
 	assert := assert.New(t)
-	goodURL := testClientFactory.DestinationURL
-	testClientFactory.DestinationURL = "broken.url"
-	_, err := testClientFactory.New()
+	goodURL := clientConfig.DestinationURL
+	clientConfig.DestinationURL = "broken.url"
+	_, err := NewClient(clientConfig)
 
-	testClientFactory.DestinationURL = goodURL
+	clientConfig.DestinationURL = goodURL
 	assert.NotNil(err)
 }
 
@@ -217,92 +235,90 @@ func TestBadHandshake(t *testing.T) {
 	}))
 	defer brokenServer.Close()
 
-	testClientFactory.DestinationURL = brokenServer.URL
-	_, err := testClientFactory.New()
+	clientConfig.DestinationURL = brokenServer.URL
+	_, err := NewClient(clientConfig)
 
-	testClientFactory.DestinationURL = testServer.URL
+	clientConfig.DestinationURL = testServer.URL
 
 	assert.NotNil(err)
 }
 
-func TestCheckPingTimeout(t *testing.T) {
-	assert := assert.New(t)
-	timesCalled := 0
-
-	fakeClient := &mockClient{}
-	fakeClient.On("Close").Return(nil).Once()
-
-	testPingMissHandler := pingMissHandler{
-		handlePingMiss: func() error {
-			timesCalled++
-			return nil
-		},
-		Logger: logging.New(nil),
-	}
-
-	pingTimer := time.NewTimer(time.Duration(1) * time.Second)
-	pinged := make(chan string)
-
-	testPingMissHandler.checkPing(pingTimer, pinged, fakeClient)
-
-	assert.Equal(1, timesCalled)
-	fakeClient.AssertExpectations(t)
-}
-
 // test the happy-path of sending a message through a websocket
 func TestSend(t *testing.T) {
-	assert := assert.New(t)
 	fakeConn := &mockConnection{}
 	fakeConn.On("WriteMessage", websocket.BinaryMessage, mock.AnythingOfType("[]uint8")).Return(nil).Once()
 
-	myMessage := wrp.SimpleRequestResponse{
+	myMessage := wrp.Message{
 		Source:      "mac:ffffff112233/emu",
 		Destination: "event:device-status/bla/bla",
 		Payload:     []byte("the payload has reached the checkpoint"),
 	}
+	logger := logging.New(nil)
 
+	sender := NewSender(fakeConn, 1, 1, logger)
+	encoder := NewEncoderSender(sender, 1, 1, logger)
 	testClient := &client{
-		connection: fakeConn,
-		Logger:     logging.New(nil),
+		encoderSender: encoder,
+		connection:    fakeConn,
+		logger:        logger,
 	}
 
-	err := testClient.Send(myMessage)
-
-	assert.Nil(err)
+	testClient.Send(&myMessage)
+	// TODO: remove sleep function
+	time.Sleep(time.Second)
 	fakeConn.AssertExpectations(t)
 }
 
 // test what happens when a websocket fails to write a message
 func TestSendBrokenWriteMessage(t *testing.T) {
-	assert := assert.New(t)
-
 	fakeConn := &mockConnection{}
 	fakeConn.On("WriteMessage", websocket.BinaryMessage, mock.AnythingOfType("[]uint8")).Return(ErrFoo).Once()
 
+	logger := logging.New(nil)
+
+	sender := NewSender(fakeConn, 1, 1, logger)
+	encoder := NewEncoderSender(sender, 1, 1, logger)
 	testClient := &client{
-		connection: fakeConn,
-		Logger:     logging.New(nil),
+		encoderSender: encoder,
+		connection:    fakeConn,
+		logger:        logger,
 	}
 
-	err := testClient.Send(nil)
-
-	assert.NotNil(err)
+	testClient.Send(nil)
+	// TODO: remove sleep function
+	time.Sleep(time.Second)
 	fakeConn.AssertExpectations(t)
 }
 
 // test the happy path of closing a websocket once we're finished using it
 func TestClose(t *testing.T) {
 	assert := assert.New(t)
+	require := require.New(t)
 
 	fakeConn := &mockConnection{}
 	fakeConn.On("Close").Return(nil).Once()
 
-	testClient := &client{
-		connection: fakeConn,
-		Logger:     logging.New(nil),
-	}
+	logger := logging.New(nil)
 
-	err := testClient.Close()
+	sender := NewSender(fakeConn, 1, 1, logger)
+	encoder := NewEncoderSender(sender, 1, 1, logger)
+	handlers, err := NewHandlerRegistry([]HandlerConfig{})
+	require.NoError(err)
+	rh := NewRegistryHandler(
+		func(message *wrp.Message) {},
+		handlers,
+		NewDownstreamSender(func(message *wrp.Message) {}, 1, 1, logger),
+		1, 1, "mac:deadbeefcafe", logger)
+	decoder := NewDecoderSender(rh, 1, 1, logger)
+
+	testClient := &client{
+		encoderSender: encoder,
+		decoderSender: decoder,
+		connection:    fakeConn,
+		logger:        logger,
+		done:          make(chan struct{}, 1),
+	}
+	err = testClient.Close()
 
 	assert.Nil(err)
 	fakeConn.AssertExpectations(t)
@@ -311,16 +327,31 @@ func TestClose(t *testing.T) {
 // test what happens when we get an error closing the websocket
 func TestCloseBroken(t *testing.T) {
 	assert := assert.New(t)
+	require := require.New(t)
 	fakeConn := &mockConnection{}
 
 	fakeConn.On("Close").Return(ErrFoo).Once()
 
-	testClient := &client{
-		connection: fakeConn,
-		Logger:     logging.New(nil),
-	}
+	logger := logging.New(nil)
+	sender := NewSender(fakeConn, 1, 1, logger)
+	encoder := NewEncoderSender(sender, 1, 1, logger)
+	handlers, err := NewHandlerRegistry([]HandlerConfig{})
+	require.NoError(err)
+	rh := NewRegistryHandler(
+		func(message *wrp.Message) {},
+		handlers,
+		NewDownstreamSender(func(message *wrp.Message) {}, 1, 1, logger),
+		1, 1, "mac:deadbeefcafe", logger)
+	decoder := NewDecoderSender(rh, 1, 1, logger)
 
-	err := testClient.Close()
+	testClient := &client{
+		encoderSender: encoder,
+		decoderSender: decoder,
+		connection:    fakeConn,
+		logger:        logger,
+		done:          make(chan struct{}, 1),
+	}
+	err = testClient.Close()
 
 	assert.NotNil(err)
 	fakeConn.AssertExpectations(t)
@@ -331,35 +362,46 @@ func TestCloseBroken(t *testing.T) {
 // they simply provide a handler and let a go routine deal with this call
 func TestRead(t *testing.T) {
 	assert := assert.New(t)
+	require := require.New(t)
 
 	fakeConn := &mockConnection{}
 	fakeConn.On("ReadMessage").Return(0, goodMsg, nil)
 
-	testClient := &client{
-		deviceID:        testClientFactory.DeviceName,
-		userAgent:       "",
-		deviceProtocols: "",
-		handlers: []HandlerRegistry{
-			{
-				HandlerKey: "/bar",
-				Handler: &myReadHandler{
-					helloMsg:      "Whaddup.",
-					goodbyeMsg:    "It's dat boi Kratos.",
-					handlerCalled: false,
-				},
+	registry, err := NewHandlerRegistry([]HandlerConfig{
+		{
+			Regexp: "/bar",
+			Handler: &myReadHandler{
+				helloMsg:      "Whaddup.",
+				goodbyeMsg:    "It's dat boi Kratos.",
+				handlerCalled: false,
 			},
 		},
-		connection: fakeConn,
-		headerInfo: nil,
-		Logger:     logging.New(nil),
+	})
+	require.NoError(err)
+	logger := logging.New(nil)
+	sender := NewSender(fakeConn, 1, 1, logger)
+	encoder := NewEncoderSender(sender, 1, 1, logger)
+
+	rh := NewRegistryHandler(func(message *wrp.Message) {},
+		registry,
+		NewDownstreamSender(func(message *wrp.Message) {}, 1, 1, logger),
+		1, 1, clientConfig.DeviceName, logger)
+	decoder := NewDecoderSender(rh, 1, 1, logger)
+	testClient := &client{
+		deviceID:        clientConfig.DeviceName,
+		userAgent:       "",
+		deviceProtocols: "",
+		registry:        registry,
+		connection:      fakeConn,
+		encoderSender:   encoder,
+		decoderSender:   decoder,
+		headerInfo:      nil,
+		logger:          logging.New(nil),
 	}
 
-	testClient.handlers[0].keyRegex, _ = regexp.Compile(testClient.handlers[0].HandlerKey)
-
 	mainWG.Add(1)
-	var err error
 	go func() {
-		err = testClient.read()
+		testClient.read()
 	}()
 
 	mainWG.Wait()
