@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [v0.2.1]
+- follow redirects until success [#33](https://github.com/xmidt-org/kratos/pull/33)
+
 ## [v0.2.0]
 - Major refactor [#24](https://github.com/xmidt-org/kratos/pull/24)
 - Connection resiliency fixes [#28](https://github.com/xmidt-org/kratos/pull/28)
@@ -19,6 +22,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
  - The first official release. We will be better about documenting changes 
    moving forward.
 
-[Unreleased]: https://github.com/xmidt-org/kratos/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/xmidt-org/kratos/compare/v0.2.1...HEAD
+[v0.2.1]: https://github.com/xmidt-org/kratos/compare/v0.2.0...v0.2.1
 [v0.2.0]: https://github.com/xmidt-org/kratos/compare/v0.1.0...v0.2.0
 [v0.1.0]: https://github.com/xmidt-org/kratos/compare/444a84c5bf3074f9a9eb16081273fd5bd8cb5ddb...v0.1.0
