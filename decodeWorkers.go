@@ -8,7 +8,7 @@ import (
 	"github.com/goph/emperror"
 	"github.com/xmidt-org/webpa-common/logging"
 	"github.com/xmidt-org/webpa-common/semaphore"
-	"github.com/xmidt-org/wrp-go/wrp"
+	"github.com/xmidt-org/wrp-go/v3"
 )
 
 const (
@@ -111,5 +111,4 @@ func (d *decoderQueue) parse(incoming []byte) {
 	// sending
 	d.sender.GetHandlerThenSend(&msg)
 	logging.Debug(d.logger).Log(logging.MessageKey(), "Message Sent")
-
 }

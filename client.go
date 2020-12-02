@@ -6,7 +6,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/goph/emperror"
 	"github.com/xmidt-org/webpa-common/logging"
-	"github.com/xmidt-org/wrp-go/wrp"
+	"github.com/xmidt-org/wrp-go/v3"
 )
 
 // Client is what function calls we expose to the user of kratos
@@ -70,21 +70,22 @@ func (c *client) Send(message *wrp.Message) {
 
 // Close closes connections downstream and the socket upstream.
 func (c *client) Close() error {
+	var connectionErr error
 	c.once.Do(func() {
 		logging.Info(c.logger).Log(logging.MessageKey(), "Closing client...")
 		close(c.done)
 		c.wg.Wait()
 		c.decoderSender.Close()
 		c.encoderSender.Close()
-		_ = c.connection.Close()
+		connectionErr = c.connection.Close()
 		c.connection = nil
-		//TODO: if this fails, can we really do anything. Is there potential for leaks?
+		// TODO: if this fails, can we really do anything. Is there potential for leaks?
 		// if err != nil {
 		// 	return emperror.Wrap(err, "Failed to close connection")
 		// }
 		logging.Info(c.logger).Log(logging.MessageKey(), "Client Closed")
 	})
-	return nil
+	return connectionErr
 }
 
 // going to be used to access the HandleMessage() function

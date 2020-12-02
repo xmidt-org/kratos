@@ -55,7 +55,6 @@ type PingConfig struct {
 
 // NewClient is used to create a new kratos Client from a ClientConfig.
 func NewClient(config ClientConfig) (Client, error) {
-
 	if config.HandlePingMiss == nil {
 		return nil, errNilHandlePingMiss
 	}

@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 - Updated travis to perform automated github releases [#25](https://github.com/xmidt-org/kratos/pull/25)
+- Bumped webpa-common to v1.11.4 [#32](https://github.com/xmidt-org/kratos/pull/32)
+- Bumped wrp-go to v3.0.1 [#32](https://github.com/xmidt-org/kratos/pull/32)
+- Fixed test too fully run [#32](https://github.com/xmidt-org/kratos/pull/32)
+- Updated references to the main branch [#32](https://github.com/xmidt-org/kratos/pull/32)
 
 ## [v0.1.0]
  - The first official release. We will be better about documenting changes 

@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/goph/emperror"
-	"github.com/xmidt-org/wrp-go/wrp"
+	"github.com/xmidt-org/wrp-go/v3"
 )
 
 // ErrNoDownstreamHandler provides an easy way for a consumer to do logic based
@@ -87,7 +87,6 @@ type handlerRegistry struct {
 // NewHandlerRegistry creates a handlerRegistry based on the initial handlers
 // given.
 func NewHandlerRegistry(config []HandlerConfig) (*handlerRegistry, error) {
-
 	registry := handlerRegistry{
 		store: make(map[string]HandlerGroup),
 	}

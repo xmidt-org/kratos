@@ -9,7 +9,7 @@ import (
 	"github.com/goph/emperror"
 	"github.com/xmidt-org/webpa-common/logging"
 	"github.com/xmidt-org/webpa-common/semaphore"
-	"github.com/xmidt-org/wrp-go/wrp"
+	"github.com/xmidt-org/wrp-go/v3"
 )
 
 // encoderSender is anything that can encode and send a message.

@@ -6,7 +6,7 @@ import (
 
 	"github.com/xmidt-org/kratos"
 	"github.com/xmidt-org/webpa-common/logging"
-	"github.com/xmidt-org/wrp-go/wrp"
+	"github.com/xmidt-org/wrp-go/v3"
 )
 
 var (
@@ -18,41 +18,45 @@ type myReadHandler struct {
 	goodbyeMsg string
 }
 
-func (m *myReadHandler) HandleMessage(msg interface{}) {
+func (m *myReadHandler) HandleMessage(msg *wrp.Message) *wrp.Message {
 	fmt.Println()
 	fmt.Println(m.helloMsg)
 	fmt.Println(m.goodbyeMsg)
 	fmt.Println(msg)
-
 	mainWG.Done()
+	return msg
+}
+
+func (m *myReadHandler) Close() {
+	fmt.Println("close")
 }
 
 func main() {
 	// right now the key in kratos for the handler is the MAC address,
 	// so make sure that's what you pass in otherwise you won't ever read anything
-	client, err := (&kratos.ClientFactory{
-		DeviceName:     "mac:ffffff112233",
+	client, err := kratos.NewClient(kratos.ClientConfig{
+		DeviceName:     "mac:deadbeefcafe",
 		FirmwareName:   "TG1682_2.1p7s1_PROD_sey",
 		ModelName:      "TG1682G",
 		Manufacturer:   "ARRIS Group, Inc.",
 		DestinationURL: "http://localhost:6200/api/v2/device",
-		Handlers: []kratos.HandlerRegistry{
+		Handlers: []kratos.HandlerConfig{
 			{
-				HandlerKey: "/foo",
+				Regexp: "/foo",
 				Handler: &myReadHandler{
 					helloMsg:   "Hello.",
 					goodbyeMsg: "I am Kratos.",
 				},
 			},
 			{
-				HandlerKey: "/bar",
+				Regexp: "/bar",
 				Handler: &myReadHandler{
 					helloMsg:   "Hi.",
 					goodbyeMsg: "My name is Kratos.",
 				},
 			},
 			{
-				HandlerKey: ".*",
+				Regexp: ".*",
 				Handler: &myReadHandler{
 					helloMsg:   "Hey.",
 					goodbyeMsg: "Have you met Kratos?",
@@ -64,7 +68,7 @@ func main() {
 			return nil
 		},
 		ClientLogger: logging.New(nil),
-	}).New()
+	})
 	if err != nil {
 		fmt.Println("Error making client: ", err)
 	}
@@ -75,16 +79,14 @@ func main() {
 	}
 
 	// construct a client message for us to send to the server
-	myMessage := wrp.SimpleRequestResponse{
+	myMessage := &wrp.Message{
 		Source:          "mac:ffffff112233/emu",
 		Destination:     "event:device-status/bla/bla",
 		TransactionUUID: "emu:" + optionalUUID,
 		Payload:         []byte("the payload has reached the checkpoint"),
 	}
 
-	if err = client.Send(myMessage); err != nil {
-		fmt.Println("Error sending message: ", err)
-	}
+	client.Send(myMessage)
 
 	mainWG.Add(1)
 	mainWG.Wait()

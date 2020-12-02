@@ -1,7 +1,22 @@
-#output
-example/example
-vendor
-*.out
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
 *.swp
 *.DS_Store
+.ignore/
 
+# Test binary, build with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+coverage.txt
+report.json
+
+*vendor/
+
+#Goland
+.idea/
