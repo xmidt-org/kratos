@@ -154,7 +154,7 @@ func createConnection(headerInfo *clientHeader, httpURL string) (connection *web
 	// creates a new client connection given the URL string
 	connection, resp, err := websocket.DefaultDialer.Dial(wsURL, headers)
 
-	if err == websocket.ErrBadHandshake && resp.StatusCode == http.StatusTemporaryRedirect {
+	for ;err == websocket.ErrBadHandshake && resp != nil && resp.StatusCode == http.StatusTemporaryRedirect; {
 		// Get url to which we are redirected and reconfigure it
 		wsURL = strings.Replace(resp.Header.Get("Location"), "http", "ws", 1)
 
