@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [v0.2.0]
+- Major refactor [#24](https://github.com/xmidt-org/kratos/pull/24)
+- Connection resiliency fixes [#28](https://github.com/xmidt-org/kratos/pull/28)
 - Updated travis to perform automated github releases [#25](https://github.com/xmidt-org/kratos/pull/25)
 - Bumped webpa-common to v1.11.4 [#32](https://github.com/xmidt-org/kratos/pull/32)
 - Bumped wrp-go to v3.0.1 [#32](https://github.com/xmidt-org/kratos/pull/32)
