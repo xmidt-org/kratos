@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 - Dependency update
   - guardrails says github.com/gorilla/websocket v1.5.0 has a high vulnerability but no vulnerabilities have been filed
+  - guardrails says github.com/gorilla/websocket v1.5.0 has a high vulnerability but no vulnerabilities have been filed
 
 ## [v0.2.1]
 - follow redirects until success [#33](https://github.com/xmidt-org/kratos/pull/33)
