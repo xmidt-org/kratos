@@ -9,9 +9,7 @@ require (
 	github.com/gorilla/websocket v1.5.0
 	github.com/influxdata/influxdb1-client v0.0.0-20220302092344-a9ab5670611c // indirect
 	github.com/pelletier/go-toml/v2 v2.0.2 // indirect
-	github.com/prometheus/client_golang v1.12.2 // indirect
-	github.com/prometheus/common v0.37.0 // indirect
-	github.com/prometheus/procfs v0.8.0 // indirect
+	github.com/prometheus/client_golang v1.13.0 // indirect
 	github.com/segmentio/ksuid v1.0.4 // indirect
 	github.com/spf13/afero v1.9.2 // indirect
 	github.com/spf13/viper v1.12.0 // indirect
@@ -20,7 +18,6 @@ require (
 	github.com/ugorji/go v1.2.7 // indirect
 	github.com/xmidt-org/webpa-common v1.11.9
 	github.com/xmidt-org/wrp-go/v3 v3.1.3
-	golang.org/x/sys v0.0.0-20220731174439-a90be440212d // indirect
-	google.golang.org/protobuf v1.28.1 // indirect
+	golang.org/x/sys v0.0.0-20220804214406-8e32c043e418 // indirect
 	gopkg.in/ini.v1 v1.66.6 // indirect
 )
