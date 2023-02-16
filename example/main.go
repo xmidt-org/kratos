@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/xmidt-org/kratos"
-	"github.com/xmidt-org/webpa-common/logging"
+	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/wrp-go/v3"
 )
 
@@ -67,7 +67,7 @@ func main() {
 			fmt.Println("We missed the ping!")
 			return nil
 		},
-		ClientLogger: logging.New(nil),
+		ClientLogger: sallust.Default(),
 	})
 	if err != nil {
 		fmt.Println("Error making client: ", err)

@@ -1,14 +1,13 @@
 package kratos
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 
-	"github.com/go-kit/kit/log"
-	"github.com/goph/emperror"
 	"github.com/gorilla/websocket"
-	"github.com/xmidt-org/webpa-common/logging"
-	"github.com/xmidt-org/webpa-common/semaphore"
+	"go.uber.org/zap"
+	"golang.org/x/sync/semaphore"
 )
 
 // outboundSender provides a way to send wrps.
@@ -22,16 +21,16 @@ type outboundSender interface {
 type senderQueue struct {
 	incoming   chan []byte
 	connection websocketConnection
-	workers    semaphore.Interface
+	workers    *semaphore.Weighted
 	wg         sync.WaitGroup
-	logger     log.Logger
+	logger     *zap.Logger
 	once       sync.Once
 	closed     atomic.Value
 }
 
 // NewSender creates a new senderQueue with the given websocketConnection and
 // other configuration.
-func NewSender(connection websocketConnection, maxWorkers int, queueSize int, logger log.Logger) *senderQueue {
+func NewSender(connection websocketConnection, maxWorkers int, queueSize int, logger *zap.Logger) *senderQueue {
 	size := queueSize
 	if size < minQueueSize {
 		size = minQueueSize
@@ -43,7 +42,7 @@ func NewSender(connection websocketConnection, maxWorkers int, queueSize int, lo
 	s := senderQueue{
 		incoming:   make(chan []byte, size),
 		connection: connection,
-		workers:    semaphore.New(numWorkers),
+		workers:    semaphore.NewWeighted(int64(numWorkers)),
 		logger:     logger,
 	}
 	s.wg.Add(1)
@@ -55,8 +54,7 @@ func NewSender(connection websocketConnection, maxWorkers int, queueSize int, lo
 func (s *senderQueue) Send(msg []byte) {
 	switch s.closed.Load() {
 	case true:
-		logging.Error(s.logger).Log(logging.MessageKey(),
-			"Failed to queue message. SenderWorker is no longer accepting messages.")
+		s.logger.Error("Failed to queue message. SenderWorker is no longer accepting messages.")
 	default:
 		s.incoming <- msg
 	}
@@ -75,9 +73,10 @@ func (s *senderQueue) Close() {
 // startSending is called when the senderQueue is created, allowing the queue
 // to read the incoming messages and send them.
 func (s *senderQueue) startSending() {
+	ctx := context.Background()
 	defer s.wg.Done()
 	for i := range s.incoming {
-		s.workers.Acquire()
+		s.workers.Acquire(ctx, 1)
 		s.wg.Add(1)
 		go s.send(i)
 	}
@@ -86,18 +85,17 @@ func (s *senderQueue) startSending() {
 // send takes the incoming message and actually sends it.
 func (s *senderQueue) send(incoming []byte) {
 	defer s.wg.Done()
-	defer s.workers.Release()
+	defer s.workers.Release(1)
 
-	logging.Debug(s.logger).Log(logging.MessageKey(), "Sending message...")
+	s.logger.Debug("Sending message...")
 
 	err := s.connection.WriteMessage(websocket.BinaryMessage, incoming)
 	if err != nil {
-		logging.Error(s.logger, emperror.Context(err)...).
-			Log(logging.MessageKey(), "Failed to send message",
-				logging.ErrorKey(), err.Error(),
-				"msg", string(incoming))
+		s.logger.Error("Failed to send message",
+			zap.Error(err),
+			zap.String("msg", string(incoming)))
 		return
 	}
 
-	logging.Debug(s.logger).Log(logging.MessageKey(), "Message Sent")
+	s.logger.Debug("Message Sent")
 }

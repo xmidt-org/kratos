@@ -1,13 +1,13 @@
 package kratos
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 
-	"github.com/go-kit/kit/log"
-	"github.com/xmidt-org/webpa-common/logging"
-	"github.com/xmidt-org/webpa-common/semaphore"
 	"github.com/xmidt-org/wrp-go/v3"
+	"go.uber.org/zap"
+	"golang.org/x/sync/semaphore"
 )
 
 // downstreamSender sends wrp messages to components downstream.
@@ -28,16 +28,16 @@ type sendInfo struct {
 type downstreamSenderQueue struct {
 	incoming chan sendInfo
 	sendFunc sendWRPFunc
-	workers  semaphore.Interface
+	workers  *semaphore.Weighted
 	wg       sync.WaitGroup
-	logger   log.Logger
+	logger   *zap.Logger
 	once     sync.Once
 	closed   atomic.Value
 }
 
 // NewDownstreamSender creates a new downstreamSenderQueue for asynchronously
 // sending wrp messages downstream.
-func NewDownstreamSender(senderFunc sendWRPFunc, maxWorkers int, queueSize int, logger log.Logger) *downstreamSenderQueue {
+func NewDownstreamSender(senderFunc sendWRPFunc, maxWorkers int, queueSize int, logger *zap.Logger) *downstreamSenderQueue {
 	size := queueSize
 	if size < minQueueSize {
 		size = minQueueSize
@@ -49,7 +49,7 @@ func NewDownstreamSender(senderFunc sendWRPFunc, maxWorkers int, queueSize int, 
 	d := downstreamSenderQueue{
 		incoming: make(chan sendInfo, size),
 		sendFunc: senderFunc,
-		workers:  semaphore.New(numWorkers),
+		workers:  semaphore.NewWeighted(int64(numWorkers)),
 		logger:   logger,
 	}
 	d.wg.Add(1)
@@ -63,8 +63,7 @@ func NewDownstreamSender(senderFunc sendWRPFunc, maxWorkers int, queueSize int, 
 func (d *downstreamSenderQueue) Send(handler DownstreamHandler, msg *wrp.Message) {
 	switch d.closed.Load() {
 	case true:
-		logging.Error(d.logger).Log(logging.MessageKey(),
-			"Failed to queue message. DownstreamSenderQueue is no longer accepting messages.")
+		d.logger.Error("Failed to queue message. DownstreamSenderQueue is no longer accepting messages.")
 	default:
 		d.incoming <- sendInfo{handler: handler, msg: msg}
 	}
@@ -84,9 +83,10 @@ func (d *downstreamSenderQueue) Close() {
 // long-running goroutine that watches the incoming messages queue and spawns
 // workers to send them.
 func (d *downstreamSenderQueue) startSending() {
+	ctx := context.Background()
 	defer d.wg.Done()
 	for i := range d.incoming {
-		d.workers.Acquire()
+		d.workers.Acquire(ctx, 1)
 		d.wg.Add(1)
 		go d.send(i)
 	}
@@ -95,16 +95,16 @@ func (d *downstreamSenderQueue) startSending() {
 // send calls HandleMessage() on the handler that the message should be sent to.
 func (d *downstreamSenderQueue) send(s sendInfo) {
 	defer d.wg.Done()
-	defer d.workers.Release()
+	defer d.workers.Release(1)
 
-	logging.Debug(d.logger).Log(logging.MessageKey(), "Sending message downstream...")
+	d.logger.Debug("Sending message downstream...")
 
 	response := s.handler.HandleMessage(s.msg)
 	if response != nil {
-		logging.Debug(d.logger).Log(logging.MessageKey(), "Downstream returned a response")
+		d.logger.Debug("Downstream returned a response")
 		d.sendFunc(response)
 		return
 	}
 
-	logging.Debug(d.logger).Log(logging.MessageKey(), "Downstream Message Sent")
+	d.logger.Debug("Downstream Message Sent")
 }

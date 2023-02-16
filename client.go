@@ -3,10 +3,8 @@ package kratos
 import (
 	"sync"
 
-	"github.com/go-kit/kit/log"
-	"github.com/goph/emperror"
-	"github.com/xmidt-org/webpa-common/logging"
 	"github.com/xmidt-org/wrp-go/v3"
+	"go.uber.org/zap"
 )
 
 // Client is what function calls we expose to the user of kratos
@@ -31,7 +29,7 @@ type client struct {
 	decoderSender   decoderSender
 	connection      websocketConnection
 	headerInfo      *clientHeader
-	logger          log.Logger
+	logger          *zap.Logger
 	done            chan struct{}
 	wg              sync.WaitGroup
 	pingConfig      PingConfig
@@ -72,7 +70,7 @@ func (c *client) Send(message *wrp.Message) {
 func (c *client) Close() error {
 	var connectionErr error
 	c.once.Do(func() {
-		logging.Info(c.logger).Log(logging.MessageKey(), "Closing client...")
+		c.logger.Info("Closing client...")
 		close(c.done)
 		c.wg.Wait()
 		c.decoderSender.Close()
@@ -83,7 +81,7 @@ func (c *client) Close() error {
 		// if err != nil {
 		// 	return emperror.Wrap(err, "Failed to close connection")
 		// }
-		logging.Info(c.logger).Log(logging.MessageKey(), "Client Closed")
+		c.logger.Info("Client Closed")
 	})
 	return connectionErr
 }
@@ -91,25 +89,24 @@ func (c *client) Close() error {
 // going to be used to access the HandleMessage() function
 func (c *client) read() {
 	defer c.wg.Done()
-	logging.Info(c.logger).Log(logging.MessageKey(), "Watching socket for messages.")
+	c.logger.Info("Watching socket for messages.")
 
 	for {
 		select {
 		case <-c.done:
-			logging.Info(c.logger).Log(logging.MessageKey(), "Stopped reading from socket.")
+			c.logger.Info("Stopped reading from socket.")
 			return
 		default:
-			logging.Debug(c.logger).Log(logging.MessageKey(), "Reading message...")
+			c.logger.Info("Reading message...")
 
 			_, serverMessage, err := c.connection.ReadMessage()
 			if err != nil {
-				logging.Error(c.logger, emperror.Context(err)...).
-					Log(logging.MessageKey(), "Failed to read message. Exiting out of read loop.", logging.ErrorKey(), err.Error())
+				c.logger.Error("Failed to read message. Exiting out of read loop.", zap.Error(err))
 				return
 			}
 			c.decoderSender.DecodeAndSend(serverMessage)
 
-			logging.Debug(c.logger).Log(logging.MessageKey(), "Message sent to be decoded")
+			c.logger.Debug("Message sent to be decoded")
 		}
 	}
 }
