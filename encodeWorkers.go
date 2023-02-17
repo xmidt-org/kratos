@@ -52,7 +52,7 @@ func NewEncoderSender(sender outboundSender, maxWorkers int, queueSize int, logg
 
 // EncodeAndSend adds the message to the queue to be sent.  It will block if
 // the queue is full.  This should not be called after Close().
-//TODO: we should consider returning an error in the case in which we can no longer encode
+// TODO: we should consider returning an error in the case in which we can no longer encode
 func (e *encoderQueue) EncodeAndSend(msg *wrp.Message) {
 	switch e.closed.Load() {
 	case true:
@@ -79,8 +79,8 @@ func (e *encoderQueue) Close() {
 // they arrive in the queue.
 func (e *encoderQueue) startParsing() {
 	defer e.wg.Done()
-	ctx := context.Background()  // TODO - does this need to be withCancel?
-	
+	ctx := context.Background() // TODO - does this need to be withCancel?
+
 	for i := range e.incoming {
 		e.workers.Acquire(ctx, 1)
 		e.wg.Add(1)
@@ -98,8 +98,8 @@ func (e *encoderQueue) parse(incoming *wrp.Message) {
 	e.logger.Error("Encoding message...")
 	err := wrp.NewEncoder(&buffer, wrp.Msgpack).Encode(incoming)
 	if err != nil {
-		e.logger.Error( "Failed to encode message", zap.Error(err),
-				zap.Any("message", incoming))
+		e.logger.Error("Failed to encode message", zap.Error(err),
+			zap.Any("message", incoming))
 		return
 	}
 	e.logger.Debug("Message Encoded")
