@@ -8,7 +8,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/xmidt-org/sallust"
-	"github.com/xmidt-org/webpa-common/device"
+	"github.com/xmidt-org/wrp-go/v3"
 	"go.uber.org/zap"
 )
 
@@ -134,7 +134,7 @@ func NewClient(config ClientConfig) (Client, error) {
 
 // private func used to generate the client that we're looking to produce
 func createConnection(headerInfo *clientHeader, httpURL string) (connection *websocket.Conn, wsURL string, err error) {
-	_, err = device.ParseID(headerInfo.deviceName)
+	_, err = wrp.ParseDeviceID(headerInfo.deviceName)
 
 	if err != nil {
 		return nil, "", err
