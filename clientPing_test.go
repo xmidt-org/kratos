@@ -26,11 +26,11 @@ var pingMissCount = 0
 func TestPingDone(t *testing.T) {
 	pingMissCount = 0
 	newClient := &client{
-		deviceID:       clientConfig.DeviceName,
-		handlePingMiss: clientConfig.HandlePingMiss,
+		deviceID:       c.DeviceName,
+		handlePingMiss: c.HandlePingMiss,
 		done:           make(chan struct{}, 1),
 		logger:         sallust.Default(),
-		pingConfig:     clientConfig.PingConfig,
+		pingConfig:     c.PingConfig,
 		wg:             sync.WaitGroup{},
 	}
 
