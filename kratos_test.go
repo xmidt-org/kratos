@@ -73,7 +73,7 @@ var (
 			fmt.Println("hi")
 			return nil
 		},
-		ClientLogger: nil,
+		ClientLogger: sallust.Default(),
 		PingConfig:   PingConfig{},
 	}
 
@@ -209,7 +209,26 @@ func TestNew(t *testing.T) {
 	assert.Equal("127.0.0.1", testClient.Hostname())
 	assert.Nil(err)
 
+	testClient.HandlerRegistry().GetHandler("reader")
 }
+
+func TestNew_NoPingMissHandler(t *testing.T) {
+	clientConfigNoPingMiss := clientConfig
+	clientConfigNoPingMiss.HandlePingMiss = nil
+	assert := assert.New(t)
+	_, err := NewClient(clientConfigNoPingMiss)
+	assert.Equal(err, errNilHandlePingMiss)
+}
+
+// func TestNew_ClientLoggerNotNil(t *testing.T) {
+// 	logger := sallust.Default()
+// 	clientConfigHasLogger := clientConfig
+// 	clientConfigHasLogger.ClientLogger = logger
+// 	assert := assert.New(t)
+// 	_, err := NewClient(clientConfigHasLogger)
+
+// 	assert.Nil(err)
+// }
 
 func Error(s string) {
 	panic("unimplemented")
