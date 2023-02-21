@@ -127,6 +127,7 @@ func NewClient(config ClientConfig) (Client, error) {
 
 	newClient.wg.Add(2)
 	go newClient.checkPing(pingTimer, pinged)
+
 	go newClient.read()
 
 	return newClient, nil

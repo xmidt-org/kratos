@@ -208,6 +208,11 @@ func TestNew(t *testing.T) {
 
 	assert.Equal("127.0.0.1", testClient.Hostname())
 	assert.Nil(err)
+
+}
+
+func Error(s string) {
+	panic("unimplemented")
 }
 
 func TestNewBrokenMAC(t *testing.T) {
