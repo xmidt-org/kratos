@@ -12,7 +12,7 @@ require (
 	github.com/segmentio/ksuid v1.0.4 // indirect
 	github.com/spf13/afero v1.9.2 // indirect
 	github.com/spf13/viper v1.12.0 // indirect
-	github.com/stretchr/testify v1.8.1
+	github.com/stretchr/testify v1.8.2
 	github.com/subosito/gotenv v1.4.0 // indirect
 	github.com/xmidt-org/webpa-common v1.11.9
 	github.com/xmidt-org/wrp-go/v3 v3.1.4
