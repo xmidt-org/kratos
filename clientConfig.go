@@ -1,7 +1,11 @@
 package kratos
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
+	"fmt"
+	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
@@ -81,7 +85,7 @@ func NewClient(config ClientConfig) (Client, error) {
 
 	// at this point we know that the URL connection is legitimate, so we can do some string manipulation
 	// with the knowledge that `:` will be found in the string twice
-	connectionURL = connectionURL[len("ws://"):strings.LastIndex(connectionURL, ":")]
+	connectionURL = strings.TrimPrefix(connectionURL[len("ws://"):], ":")
 
 	var logger log.Logger
 	if config.ClientLogger != nil {
@@ -140,6 +144,14 @@ func createConnection(headerInfo *clientHeader, httpURL string) (connection *web
 		return nil, "", err
 	}
 
+	dialer := &websocket.Dialer{}
+
+	tlsConfig, err := GetTLSConfig(strings.Split(headerInfo.deviceName, ":")[1])
+	if err == nil {
+		// Set the TLS configuration of the dialer
+		dialer.TLSClientConfig = tlsConfig
+	}
+
 	// make a header and put some data in that (including MAC address)
 	// TODO: find special function for user agent
 	headers := make(http.Header)
@@ -152,13 +164,14 @@ func createConnection(headerInfo *clientHeader, httpURL string) (connection *web
 	wsURL = strings.Replace(httpURL, "http", "ws", 1)
 
 	// creates a new client connection given the URL string
-	connection, resp, err := websocket.DefaultDialer.Dial(wsURL, headers)
+	connection, resp, err := dialer.Dial(wsURL, headers)
 
-	for ;err == websocket.ErrBadHandshake && resp != nil && resp.StatusCode == http.StatusTemporaryRedirect; {
+	for err == websocket.ErrBadHandshake && resp != nil && resp.StatusCode == http.StatusTemporaryRedirect {
+		fmt.Println(err)
 		// Get url to which we are redirected and reconfigure it
 		wsURL = strings.Replace(resp.Header.Get("Location"), "http", "ws", 1)
 
-		connection, resp, err = websocket.DefaultDialer.Dial(wsURL, headers)
+		connection, resp, err = dialer.Dial(wsURL, headers)
 	}
 
 	if err != nil {
@@ -169,4 +182,33 @@ func createConnection(headerInfo *clientHeader, httpURL string) (connection *web
 	}
 
 	return connection, wsURL, nil
+}
+
+func GetTLSConfig(macaddress string) (*tls.Config, error) {
+	certFile := fmt.Sprintf("./certificates/%s-client.crt", macaddress)
+	keyFile := fmt.Sprintf("./certificates/%s-key.pem", macaddress)
+	caFile := "./certificates/ca.crt"
+
+	// Try reading the certificate files with the prefix of the provided macaddress
+	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		// If that fails, try reading the certificate files without the prefix
+		certFile = "./certificates/client.crt"
+		keyFile = "./certificates/key.pem"
+		cert, err = tls.LoadX509KeyPair(certFile, keyFile)
+		if err != nil {
+			return nil, err
+		}
+	}
+	caCert, err := ioutil.ReadFile(caFile)
+	if err != nil {
+		return nil, err
+	}
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCert)
+	tlsConfig := &tls.Config{
+		RootCAs:      caCertPool,
+		Certificates: []tls.Certificate{cert},
+	}
+	return tlsConfig, nil
 }
