@@ -38,6 +38,8 @@ type ClientConfig struct {
 	DestinationURL        string
 	CertificatesPATH      string
 	CallPetasosForTalaria bool
+	UseSSLForPetasos      bool
+	UseSSLForTalaria      bool
 	OutboundQueue         QueueConfig
 	WRPEncoderQueue       QueueConfig
 	WRPDecoderQueue       QueueConfig
@@ -147,15 +149,14 @@ func createConnection(headerInfo *clientHeader, config ClientConfig) (connection
 		return nil, "", err
 	}
 
-	tlsConfig, err := GetTLSConfig(strings.Split(headerInfo.deviceName, ":")[1], config.CertificatesPATH)
 	var talariaInstance = config.DestinationURL
+	tlsConfig := GetTLSConfig(strings.Split(config.DeviceName, ":")[1], config.CertificatesPATH)
 	if config.CallPetasosForTalaria {
 		talariaInstance, err = getTalariaInstance(config, tlsConfig)
 	}
 
 	dialer := &websocket.Dialer{}
-	if err == nil {
-		// Set the TLS configuration of the dialer
+	if config.UseSSLForTalaria {
 		dialer.TLSClientConfig = tlsConfig
 	}
 
@@ -195,6 +196,9 @@ func getTalariaInstance(config ClientConfig, tlsConfig *tls.Config) (string, err
 
 	// Create HTTP client with custom transport
 
+	if !config.UseSSLForPetasos {
+		tlsConfig = nil
+	}
 	tr := &http.Transport{
 		TLSClientConfig:    tlsConfig,
 		DisableCompression: true,
@@ -230,7 +234,7 @@ func getTalariaInstance(config ClientConfig, tlsConfig *tls.Config) (string, err
 	return match, nil
 }
 
-func GetTLSConfig(macAddress string, certificatesPath string) (*tls.Config, error) {
+func GetTLSConfig(macAddress string, certificatesPath string) *tls.Config {
 	certFile := fmt.Sprintf("%s/%s-client.crt", certificatesPath, macAddress)
 	keyFile := fmt.Sprintf("%s/%s-key.pem", certificatesPath, macAddress)
 	caFile := fmt.Sprintf("%s/ca.crt", certificatesPath)
@@ -244,13 +248,13 @@ func GetTLSConfig(macAddress string, certificatesPath string) (*tls.Config, erro
 		cert, err = tls.LoadX509KeyPair(certFile, keyFile)
 		if err != nil {
 			fmt.Println(err)
-			return nil, err
+			return nil
 		}
 	}
 
 	caCert, err := ioutil.ReadFile(caFile)
 	if err != nil {
-		return nil, err
+		return nil
 	}
 	caCertPool := x509.NewCertPool()
 	caCertPool.AppendCertsFromPEM(caCert)
@@ -258,6 +262,6 @@ func GetTLSConfig(macAddress string, certificatesPath string) (*tls.Config, erro
 	return &tls.Config{
 		RootCAs:      caCertPool,
 		Certificates: []tls.Certificate{cert},
-	}, nil
+	}
 
 }
