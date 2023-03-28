@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -30,20 +31,22 @@ var (
 
 // ClientConfig is the configuration to provide when making a new client.
 type ClientConfig struct {
-	DeviceName           string
-	FirmwareName         string
-	ModelName            string
-	Manufacturer         string
-	DestinationURL       string
-	OutboundQueue        QueueConfig
-	WRPEncoderQueue      QueueConfig
-	WRPDecoderQueue      QueueConfig
-	HandlerRegistryQueue QueueConfig
-	HandleMsgQueue       QueueConfig
-	Handlers             []HandlerConfig
-	HandlePingMiss       HandlePingMiss
-	ClientLogger         log.Logger
-	PingConfig           PingConfig
+	DeviceName            string
+	FirmwareName          string
+	ModelName             string
+	Manufacturer          string
+	DestinationURL        string
+	CertificatesPATH      string
+	CallPetasosForTalaria bool
+	OutboundQueue         QueueConfig
+	WRPEncoderQueue       QueueConfig
+	WRPDecoderQueue       QueueConfig
+	HandlerRegistryQueue  QueueConfig
+	HandleMsgQueue        QueueConfig
+	Handlers              []HandlerConfig
+	HandlePingMiss        HandlePingMiss
+	ClientLogger          log.Logger
+	PingConfig            PingConfig
 }
 
 // QueueConfig is used to configure all the queues used to make kratos asynchronous.
@@ -70,7 +73,7 @@ func NewClient(config ClientConfig) (Client, error) {
 		manufacturer: config.Manufacturer,
 	}
 
-	newConnection, connectionURL, err := createConnection(inHeader, config.DestinationURL)
+	newConnection, connectionURL, err := createConnection(inHeader, config)
 
 	if err != nil {
 		return nil, err
@@ -137,16 +140,20 @@ func NewClient(config ClientConfig) (Client, error) {
 }
 
 // private func used to generate the client that we're looking to produce
-func createConnection(headerInfo *clientHeader, httpURL string) (connection *websocket.Conn, wsURL string, err error) {
+func createConnection(headerInfo *clientHeader, config ClientConfig) (connection *websocket.Conn, wsURL string, err error) {
 	_, err = device.ParseID(headerInfo.deviceName)
 
 	if err != nil {
 		return nil, "", err
 	}
 
-	dialer := &websocket.Dialer{}
+	tlsConfig, err := GetTLSConfig(strings.Split(headerInfo.deviceName, ":")[1], config.CertificatesPATH)
+	var talariaInstance = config.DestinationURL
+	if config.CallPetasosForTalaria {
+		talariaInstance, err = getTalariaInstance(config, tlsConfig)
+	}
 
-	tlsConfig, err := GetTLSConfig(strings.Split(headerInfo.deviceName, ":")[1])
+	dialer := &websocket.Dialer{}
 	if err == nil {
 		// Set the TLS configuration of the dialer
 		dialer.TLSClientConfig = tlsConfig
@@ -161,7 +168,7 @@ func createConnection(headerInfo *clientHeader, httpURL string) (connection *web
 	headers.Add("X-Webpa-Manufacturer", headerInfo.manufacturer)
 
 	// make sure destUrl's protocol is websocket (ws)
-	wsURL = strings.Replace(httpURL, "http", "ws", 1)
+	wsURL = strings.Replace(talariaInstance, "http", "ws", 1)
 
 	// creates a new client connection given the URL string
 	connection, resp, err := dialer.Dial(wsURL, headers)
@@ -184,31 +191,73 @@ func createConnection(headerInfo *clientHeader, httpURL string) (connection *web
 	return connection, wsURL, nil
 }
 
-func GetTLSConfig(macaddress string) (*tls.Config, error) {
-	certFile := fmt.Sprintf("./certificates/%s-client.crt", macaddress)
-	keyFile := fmt.Sprintf("./certificates/%s-key.pem", macaddress)
-	caFile := "./certificates/ca.crt"
+func getTalariaInstance(config ClientConfig, tlsConfig *tls.Config) (string, error) {
+
+	// Create HTTP client with custom transport
+
+	tr := &http.Transport{
+		TLSClientConfig:    tlsConfig,
+		DisableCompression: true,
+		DisableKeepAlives:  true,
+	}
+	client := &http.Client{Transport: tr, CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		return http.ErrUseLastResponse
+	}}
+
+	// Create HTTP request with headers
+	req, err := http.NewRequest("GET", config.DestinationURL, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("X-Webpa-Device-Name", config.DeviceName)
+
+	// Send HTTP request and get response
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	// Read response body
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	pattern := `((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s!()\[\]{};:\'".,<>?«»“”‘’]))`
+
+	re := regexp.MustCompile(pattern)
+	match := re.FindString(string(body))
+	return match, nil
+}
+
+func GetTLSConfig(macAddress string, certificatesPath string) (*tls.Config, error) {
+	certFile := fmt.Sprintf("%s/%s-client.crt", certificatesPath, macAddress)
+	keyFile := fmt.Sprintf("%s/%s-key.pem", certificatesPath, macAddress)
+	caFile := fmt.Sprintf("%s/ca.crt", certificatesPath)
 
 	// Try reading the certificate files with the prefix of the provided macaddress
 	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
 	if err != nil {
 		// If that fails, try reading the certificate files without the prefix
-		certFile = "./certificates/client.crt"
-		keyFile = "./certificates/key.pem"
+		certFile = fmt.Sprintf("%s/client.crt", certificatesPath)
+		keyFile = fmt.Sprintf("%s/key.pem", certificatesPath)
 		cert, err = tls.LoadX509KeyPair(certFile, keyFile)
 		if err != nil {
+			fmt.Println(err)
 			return nil, err
 		}
 	}
+
 	caCert, err := ioutil.ReadFile(caFile)
 	if err != nil {
 		return nil, err
 	}
 	caCertPool := x509.NewCertPool()
 	caCertPool.AppendCertsFromPEM(caCert)
-	tlsConfig := &tls.Config{
+
+	return &tls.Config{
 		RootCAs:      caCertPool,
 		Certificates: []tls.Certificate{cert},
-	}
-	return tlsConfig, nil
+	}, nil
+
 }
