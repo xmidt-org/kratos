@@ -153,6 +153,9 @@ func createConnection(headerInfo *clientHeader, config ClientConfig) (connection
 	tlsConfig := GetTLSConfig(strings.Split(config.DeviceName, ":")[1], config.CertificatesPATH)
 	if config.CallPetasosForTalaria {
 		talariaInstance, err = getTalariaInstance(config, tlsConfig)
+		if err != nil {
+			fmt.Println("Error while fetching Talaria for mac", config.DeviceName, err)
+		}
 	}
 
 	dialer := &websocket.Dialer{}
