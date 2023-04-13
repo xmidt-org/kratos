@@ -14,8 +14,9 @@ require (
 	github.com/spf13/viper v1.12.0 // indirect
 	github.com/stretchr/testify v1.8.2
 	github.com/subosito/gotenv v1.4.0 // indirect
+	github.com/ugorji/go v1.2.7 // indirect
 	github.com/xmidt-org/webpa-common v1.11.9
-	github.com/xmidt-org/wrp-go/v3 v3.1.4
+	github.com/xmidt-org/wrp-go/v3 v3.1.6
 	golang.org/x/sys v0.0.0-20220804214406-8e32c043e418 // indirect
 	gopkg.in/ini.v1 v1.66.6 // indirect
 )
