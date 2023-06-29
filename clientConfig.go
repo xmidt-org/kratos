@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	"github.com/gorilla/websocket"
+	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/webpa-common/device"
-	"github.com/xmidt-org/webpa-common/logging"
+	"go.uber.org/zap"
 )
 
 const (
@@ -38,7 +38,7 @@ type ClientConfig struct {
 	HandleMsgQueue       QueueConfig
 	Handlers             []HandlerConfig
 	HandlePingMiss       HandlePingMiss
-	ClientLogger         log.Logger
+	ClientLogger         *zap.Logger
 	PingConfig           PingConfig
 }
 
@@ -83,11 +83,11 @@ func NewClient(config ClientConfig) (Client, error) {
 	// with the knowledge that `:` will be found in the string twice
 	connectionURL = connectionURL[len("ws://"):strings.LastIndex(connectionURL, ":")]
 
-	var logger log.Logger
+	var logger *zap.Logger
 	if config.ClientLogger != nil {
 		logger = config.ClientLogger
 	} else {
-		logger = logging.DefaultLogger()
+		logger = sallust.Default()
 	}
 	if config.PingConfig.MaxPingMiss <= 0 {
 		config.PingConfig.MaxPingMiss = 1
@@ -115,7 +115,7 @@ func NewClient(config ClientConfig) (Client, error) {
 
 	newClient.registry, err = NewHandlerRegistry(config.Handlers)
 	if err != nil {
-		logging.Warn(newClient.logger).Log(logging.MessageKey(), "failed to initialize all handlers for registry", logging.ErrorKey(), err.Error())
+		newClient.logger.Warn("failed to initialize all handlers for registry", zap.Error(err))
 	}
 
 	downstreamSender := NewDownstreamSender(newClient.Send, config.HandleMsgQueue.MaxWorkers, config.HandleMsgQueue.Size, logger)
@@ -154,7 +154,7 @@ func createConnection(headerInfo *clientHeader, httpURL string) (connection *web
 	// creates a new client connection given the URL string
 	connection, resp, err := websocket.DefaultDialer.Dial(wsURL, headers)
 
-	for ;err == websocket.ErrBadHandshake && resp != nil && resp.StatusCode == http.StatusTemporaryRedirect; {
+	for err == websocket.ErrBadHandshake && resp != nil && resp.StatusCode == http.StatusTemporaryRedirect {
 		// Get url to which we are redirected and reconfigure it
 		wsURL = strings.Replace(resp.Header.Get("Location"), "http", "ws", 1)
 

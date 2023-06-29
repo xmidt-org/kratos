@@ -4,11 +4,9 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/go-kit/kit/log"
-	"github.com/goph/emperror"
-	"github.com/xmidt-org/webpa-common/logging"
 	"github.com/xmidt-org/webpa-common/semaphore"
 	"github.com/xmidt-org/wrp-go/v3"
+	"go.uber.org/zap"
 )
 
 const (
@@ -29,14 +27,14 @@ type decoderQueue struct {
 	sender   registryHandler
 	workers  semaphore.Interface
 	wg       sync.WaitGroup
-	logger   log.Logger
+	logger   *zap.Logger
 	once     sync.Once
 	closed   atomic.Value
 }
 
 // NewDecoderSender creates a new decoderQueue for decoding and sending
 // messages.
-func NewDecoderSender(sender registryHandler, maxWorkers int, queueSize int, logger log.Logger) *decoderQueue {
+func NewDecoderSender(sender registryHandler, maxWorkers int, queueSize int, logger *zap.Logger) *decoderQueue {
 	size := queueSize
 	if size < minQueueSize {
 		size = minQueueSize
@@ -61,8 +59,7 @@ func NewDecoderSender(sender registryHandler, maxWorkers int, queueSize int, log
 func (d *decoderQueue) DecodeAndSend(msg []byte) {
 	switch d.closed.Load() {
 	case true:
-		logging.Error(d.logger).Log(logging.MessageKey(),
-			"Failed to queue message. DecoderQueue is no longer accepting messages.")
+		d.logger.Error("Failed to queue message. DecoderQueue is no longer accepting messages.")
 	default:
 		d.incoming <- msg
 	}
@@ -99,16 +96,18 @@ func (d *decoderQueue) parse(incoming []byte) {
 	msg := wrp.Message{}
 
 	// decoding
-	logging.Debug(d.logger).Log(logging.MessageKey(), "Decoding message...")
+	d.logger.Debug("Decoding message...")
 	err := wrp.NewDecoderBytes(incoming, wrp.Msgpack).Decode(&msg)
 	if err != nil {
-		logging.Error(d.logger, emperror.Context(err)...).
-			Log(logging.MessageKey(), "Failed to decode message into wrp", logging.ErrorKey(), err.Error())
+		d.logger.Error("Failed to decode message into wrp", zap.Error(err))
+		//TODO: need to figure out emperror.Context
+		// logging.Error(d.logger, emperror.Context(err)...).
+		// 	Log(logging.MessageKey(), "Failed to decode message into wrp", logging.ErrorKey(), err.Error())
 		return
 	}
-	logging.Debug(d.logger).Log(logging.MessageKey(), "Message Decoded")
+	d.logger.Debug("Message Decoded")
 
 	// sending
 	d.sender.GetHandlerThenSend(&msg)
-	logging.Debug(d.logger).Log(logging.MessageKey(), "Message Sent")
+	d.logger.Debug("Message Sent")
 }

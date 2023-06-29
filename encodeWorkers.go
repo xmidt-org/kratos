@@ -5,11 +5,9 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/go-kit/kit/log"
-	"github.com/goph/emperror"
-	"github.com/xmidt-org/webpa-common/logging"
 	"github.com/xmidt-org/webpa-common/semaphore"
 	"github.com/xmidt-org/wrp-go/v3"
+	"go.uber.org/zap"
 )
 
 // encoderSender is anything that can encode and send a message.
@@ -24,14 +22,14 @@ type encoderQueue struct {
 	sender   outboundSender
 	workers  semaphore.Interface
 	wg       sync.WaitGroup
-	logger   log.Logger
+	logger   *zap.Logger
 	once     sync.Once
 	closed   atomic.Value
 }
 
 // NewEncoderSender creates a new encoderQueue, that allows for asynchronous
 // sending outbound.
-func NewEncoderSender(sender outboundSender, maxWorkers int, queueSize int, logger log.Logger) *encoderQueue {
+func NewEncoderSender(sender outboundSender, maxWorkers int, queueSize int, logger *zap.Logger) *encoderQueue {
 	size := queueSize
 	if size < minQueueSize {
 		size = minQueueSize
@@ -53,12 +51,11 @@ func NewEncoderSender(sender outboundSender, maxWorkers int, queueSize int, logg
 
 // EncodeAndSend adds the message to the queue to be sent.  It will block if
 // the queue is full.  This should not be called after Close().
-//TODO: we should consider returning an error in the case in which we can no longer encode
+// TODO: we should consider returning an error in the case in which we can no longer encode
 func (e *encoderQueue) EncodeAndSend(msg *wrp.Message) {
 	switch e.closed.Load() {
 	case true:
-		logging.Error(e.logger).Log(logging.MessageKey(),
-			"Failed to queue message. EncoderQueue is no longer accepting messages.")
+		e.logger.Error("Failed to queue message. EncoderQueue is no longer accepting messages.")
 	default:
 		e.incoming <- msg
 	}
@@ -94,18 +91,20 @@ func (e *encoderQueue) parse(incoming *wrp.Message) {
 	var buffer bytes.Buffer
 
 	// encoding
-	logging.Debug(e.logger).Log(logging.MessageKey(), "Encoding message...")
+	e.logger.Debug("Encoding message...")
 	err := wrp.NewEncoder(&buffer, wrp.Msgpack).Encode(incoming)
 	if err != nil {
-		logging.Error(e.logger, emperror.Context(err)...).
-			Log(logging.MessageKey(), "Failed to encode message",
-				logging.ErrorKey(), err.Error(),
-				"message", incoming)
+		e.logger.Error("Failed to encode message", zap.Error(err), zap.Any("message", incoming))
+		//TODO: need to figure out emperror.Context
+		// logging.Error(e.logger, emperror.Context(err)...).
+		// 	Log(logging.MessageKey(), "Failed to encode message",
+		// 		logging.ErrorKey(), err.Error(),
+		// 		"message", incoming)
 		return
 	}
-	logging.Debug(e.logger).Log(logging.MessageKey(), "Message Encoded")
+	e.logger.Debug("Message Encoded")
 
 	// sending
 	e.sender.Send(buffer.Bytes())
-	logging.Debug(e.logger).Log(logging.MessageKey(), "Message Sent")
+	e.logger.Debug("Message Sent")
 }

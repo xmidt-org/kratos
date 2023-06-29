@@ -4,18 +4,19 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/gorilla/websocket"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	"github.com/xmidt-org/webpa-common/logging"
-	"github.com/xmidt-org/wrp-go/v3"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/gorilla/websocket"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"github.com/xmidt-org/wrp-go/v3"
+	"go.uber.org/zap/zaptest"
 )
 
 const (
@@ -253,7 +254,7 @@ func TestSend(t *testing.T) {
 		Destination: "event:device-status/bla/bla",
 		Payload:     []byte("the payload has reached the checkpoint"),
 	}
-	logger := logging.New(nil)
+	logger := zaptest.NewLogger(t)
 
 	sender := NewSender(fakeConn, 1, 1, logger)
 	encoder := NewEncoderSender(sender, 1, 1, logger)
@@ -274,7 +275,7 @@ func TestSendBrokenWriteMessage(t *testing.T) {
 	fakeConn := &mockConnection{}
 	fakeConn.On("WriteMessage", websocket.BinaryMessage, mock.AnythingOfType("[]uint8")).Return(ErrFoo).Once()
 
-	logger := logging.New(nil)
+	logger := zaptest.NewLogger(t)
 
 	sender := NewSender(fakeConn, 1, 1, logger)
 	encoder := NewEncoderSender(sender, 1, 1, logger)
@@ -298,7 +299,7 @@ func TestClose(t *testing.T) {
 	fakeConn := &mockConnection{}
 	fakeConn.On("Close").Return(nil).Once()
 
-	logger := logging.New(nil)
+	logger := zaptest.NewLogger(t)
 
 	sender := NewSender(fakeConn, 1, 1, logger)
 	encoder := NewEncoderSender(sender, 1, 1, logger)
@@ -332,7 +333,7 @@ func TestCloseBroken(t *testing.T) {
 
 	fakeConn.On("Close").Return(ErrFoo).Once()
 
-	logger := logging.New(nil)
+	logger := zaptest.NewLogger(t)
 	sender := NewSender(fakeConn, 1, 1, logger)
 	encoder := NewEncoderSender(sender, 1, 1, logger)
 	handlers, err := NewHandlerRegistry([]HandlerConfig{})
@@ -378,7 +379,7 @@ func TestRead(t *testing.T) {
 		},
 	})
 	require.NoError(err)
-	logger := logging.New(nil)
+	logger := zaptest.NewLogger(t)
 	sender := NewSender(fakeConn, 1, 1, logger)
 	encoder := NewEncoderSender(sender, 1, 1, logger)
 
@@ -396,7 +397,7 @@ func TestRead(t *testing.T) {
 		encoderSender:   encoder,
 		decoderSender:   decoder,
 		headerInfo:      nil,
-		logger:          logging.New(nil),
+		logger:          zaptest.NewLogger(t),
 	}
 
 	mainWG.Add(1)

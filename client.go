@@ -103,7 +103,8 @@ func (c *client) read() {
 			if err != nil {
 				c.logger.Error("Failed to read message. Exiting out of read loop.", zap.Error(err))
 
-				//				logging.Error(c.logger, emperror.Context(err)...).Log(logging.MessageKey(), "Failed to read message. Exiting out of read loop.", logging.ErrorKey(), err.Error())
+				//TODO: figure out the emperror.Context(err) and how to print
+				//logging.Error(c.logger, emperror.Context(err)...).Log(logging.MessageKey(), "Failed to read message. Exiting out of read loop.", logging.ErrorKey(), err.Error())
 
 				return
 			}
