@@ -1,14 +1,13 @@
 package kratos
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 
-	"github.com/go-kit/kit/log"
-	"github.com/goph/emperror"
-	"github.com/xmidt-org/webpa-common/logging"
-	"github.com/xmidt-org/webpa-common/semaphore"
 	"github.com/xmidt-org/wrp-go/v3"
+	"go.uber.org/zap"
+	"golang.org/x/sync/semaphore"
 )
 
 const (
@@ -27,16 +26,16 @@ type decoderSender interface {
 type decoderQueue struct {
 	incoming chan []byte
 	sender   registryHandler
-	workers  semaphore.Interface
+	workers  *semaphore.Weighted
 	wg       sync.WaitGroup
-	logger   log.Logger
+	logger   *zap.Logger
 	once     sync.Once
 	closed   atomic.Value
 }
 
 // NewDecoderSender creates a new decoderQueue for decoding and sending
 // messages.
-func NewDecoderSender(sender registryHandler, maxWorkers int, queueSize int, logger log.Logger) *decoderQueue {
+func NewDecoderSender(sender registryHandler, maxWorkers int, queueSize int, logger *zap.Logger) *decoderQueue {
 	size := queueSize
 	if size < minQueueSize {
 		size = minQueueSize
@@ -48,7 +47,7 @@ func NewDecoderSender(sender registryHandler, maxWorkers int, queueSize int, log
 	d := decoderQueue{
 		incoming: make(chan []byte, size),
 		sender:   sender,
-		workers:  semaphore.New(numWorkers),
+		workers:  semaphore.NewWeighted(int64(numWorkers)),
 		logger:   logger,
 	}
 	d.wg.Add(1)
@@ -61,7 +60,7 @@ func NewDecoderSender(sender registryHandler, maxWorkers int, queueSize int, log
 func (d *decoderQueue) DecodeAndSend(msg []byte) {
 	switch d.closed.Load() {
 	case true:
-		logging.Error(d.logger).Log(logging.MessageKey(),
+		d.logger.Error(
 			"Failed to queue message. DecoderQueue is no longer accepting messages.")
 	default:
 		d.incoming <- msg
@@ -83,9 +82,10 @@ func (d *decoderQueue) Close() {
 // long-running go routine that watches the queue and starts other go routines
 // to decode and send the messages.
 func (d *decoderQueue) startParsing() {
+	ctx := context.Background()
 	defer d.wg.Done()
 	for i := range d.incoming {
-		d.workers.Acquire()
+		d.workers.Acquire(ctx, 1)
 		d.wg.Add(1)
 		go d.parse(i)
 	}
@@ -95,20 +95,19 @@ func (d *decoderQueue) startParsing() {
 // registryHandler.
 func (d *decoderQueue) parse(incoming []byte) {
 	defer d.wg.Done()
-	defer d.workers.Release()
+	defer d.workers.Release(1)
 	msg := wrp.Message{}
 
 	// decoding
-	logging.Debug(d.logger).Log(logging.MessageKey(), "Decoding message...")
+	d.logger.Debug("Decoding message...")
 	err := wrp.NewDecoderBytes(incoming, wrp.Msgpack).Decode(&msg)
 	if err != nil {
-		logging.Error(d.logger, emperror.Context(err)...).
-			Log(logging.MessageKey(), "Failed to decode message into wrp", logging.ErrorKey(), err.Error())
+		d.logger.Error("Failed to decode message into wrp", zap.Error(err))
 		return
 	}
-	logging.Debug(d.logger).Log(logging.MessageKey(), "Message Decoded")
+	d.logger.Debug("Message Decoded")
 
 	// sending
 	d.sender.GetHandlerThenSend(&msg)
-	logging.Debug(d.logger).Log(logging.MessageKey(), "Message Sent")
+	d.logger.Debug("Message Sent")
 }

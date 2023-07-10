@@ -4,18 +4,21 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"github.com/xmidt-org/webpa-common/logging"
-	"github.com/xmidt-org/wrp-go/v3"
+
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/xmidt-org/sallust"
+	"github.com/xmidt-org/wrp-go/v3"
 )
 
 const (
@@ -205,6 +208,30 @@ func TestNew(t *testing.T) {
 
 	assert.Equal("127.0.0.1", testClient.Hostname())
 	assert.Nil(err)
+
+	testClient.HandlerRegistry().GetHandler("reader")
+}
+
+func TestNew_NoPingMissHandler(t *testing.T) {
+	clientConfigNoPingMiss := clientConfig
+	clientConfigNoPingMiss.HandlePingMiss = nil
+	assert := assert.New(t)
+	_, err := NewClient(clientConfigNoPingMiss)
+	assert.Equal(err, errNilHandlePingMiss)
+}
+
+func TestNew_ClientLoggerNotNil(t *testing.T) {
+	logger := sallust.Default()
+	clientConfigHasLogger := clientConfig
+	clientConfigHasLogger.ClientLogger = logger
+	assert := assert.New(t)
+	_, err := NewClient(clientConfigHasLogger)
+
+	assert.Nil(err)
+}
+
+func Error(s string) {
+	panic("unimplemented")
 }
 
 func TestNewBrokenMAC(t *testing.T) {
@@ -253,7 +280,7 @@ func TestSend(t *testing.T) {
 		Destination: "event:device-status/bla/bla",
 		Payload:     []byte("the payload has reached the checkpoint"),
 	}
-	logger := logging.New(nil)
+	logger := sallust.Default()
 
 	sender := NewSender(fakeConn, 1, 1, logger)
 	encoder := NewEncoderSender(sender, 1, 1, logger)
@@ -274,7 +301,7 @@ func TestSendBrokenWriteMessage(t *testing.T) {
 	fakeConn := &mockConnection{}
 	fakeConn.On("WriteMessage", websocket.BinaryMessage, mock.AnythingOfType("[]uint8")).Return(ErrFoo).Once()
 
-	logger := logging.New(nil)
+	logger := sallust.Default()
 
 	sender := NewSender(fakeConn, 1, 1, logger)
 	encoder := NewEncoderSender(sender, 1, 1, logger)
@@ -298,7 +325,7 @@ func TestClose(t *testing.T) {
 	fakeConn := &mockConnection{}
 	fakeConn.On("Close").Return(nil).Once()
 
-	logger := logging.New(nil)
+	logger := sallust.Default()
 
 	sender := NewSender(fakeConn, 1, 1, logger)
 	encoder := NewEncoderSender(sender, 1, 1, logger)
@@ -332,7 +359,7 @@ func TestCloseBroken(t *testing.T) {
 
 	fakeConn.On("Close").Return(ErrFoo).Once()
 
-	logger := logging.New(nil)
+	logger := sallust.Default()
 	sender := NewSender(fakeConn, 1, 1, logger)
 	encoder := NewEncoderSender(sender, 1, 1, logger)
 	handlers, err := NewHandlerRegistry([]HandlerConfig{})
@@ -378,7 +405,7 @@ func TestRead(t *testing.T) {
 		},
 	})
 	require.NoError(err)
-	logger := logging.New(nil)
+	logger := sallust.Default()
 	sender := NewSender(fakeConn, 1, 1, logger)
 	encoder := NewEncoderSender(sender, 1, 1, logger)
 
@@ -396,7 +423,7 @@ func TestRead(t *testing.T) {
 		encoderSender:   encoder,
 		decoderSender:   decoder,
 		headerInfo:      nil,
-		logger:          logging.New(nil),
+		logger:          sallust.Default(),
 	}
 
 	mainWG.Add(1)

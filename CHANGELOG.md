@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Dependency update, note vulnerabilities
   - guardrails says github.com/gorilla/websocket v1.5.0 has a high vulnerability but no vulnerabilities have been filed
   - [golang/github.com/gorilla/websocket@1.2.0 no patch available](golang/github.com/gorilla/websocket@1.2.0)
+  - remove webpa commons [#45] [https://github.com/xmidt-org/kratos/issues/45]
 
 ## [v0.2.1]
 - follow redirects until success [#33](https://github.com/xmidt-org/kratos/pull/33)
