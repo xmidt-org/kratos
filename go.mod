@@ -8,7 +8,7 @@ require (
 	github.com/kr/pretty v0.3.0 // indirect
 	github.com/stretchr/testify v1.8.4
 	github.com/ugorji/go v1.2.7 // indirect
-	github.com/xmidt-org/sallust v0.2.1
+	github.com/xmidt-org/sallust v0.2.2
 	github.com/xmidt-org/wrp-go/v3 v3.1.6
 	go.uber.org/zap v1.24.0
 	golang.org/x/sync v0.1.0
