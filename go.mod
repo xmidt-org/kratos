@@ -9,7 +9,7 @@ require (
 	github.com/stretchr/testify v1.8.4
 	github.com/ugorji/go v1.2.7 // indirect
 	github.com/xmidt-org/sallust v0.2.2
-	github.com/xmidt-org/wrp-go/v3 v3.2.0
+	github.com/xmidt-org/wrp-go/v3 v3.2.1
 	go.uber.org/zap v1.26.0
 	golang.org/x/sync v0.4.0
 	golang.org/x/xerrors v0.0.0-20220517211312-f3a8303e98df // indirect
