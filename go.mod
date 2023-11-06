@@ -11,5 +11,5 @@ require (
 	github.com/xmidt-org/sallust v0.2.2
 	github.com/xmidt-org/wrp-go/v3 v3.2.1
 	go.uber.org/zap v1.26.0
-	golang.org/x/sync v0.4.0
+	golang.org/x/sync v0.5.0
 )
