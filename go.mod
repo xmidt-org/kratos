@@ -10,6 +10,6 @@ require (
 	github.com/ugorji/go v1.2.7 // indirect
 	github.com/xmidt-org/sallust v0.2.2
 	github.com/xmidt-org/wrp-go/v3 v3.2.3
-	go.uber.org/zap v1.26.0
+	go.uber.org/zap v1.27.0
 	golang.org/x/sync v0.6.0
 )
