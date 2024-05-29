@@ -2,6 +2,9 @@
 linters-settings:
   misspell:
     locale: US
+  errorlint:
+    # Report non-wrapping error creation using fmt.Errorf
+    errorf: false
 
 linters:
   enable:
@@ -24,8 +27,3 @@ issues:
       linters:
         - dupl
         - funlen
-
-linters-settings:
-  errorlint:
-    # Report non-wrapping error creation using fmt.Errorf
-    errorf: false
