@@ -4,7 +4,7 @@ go 1.13
 
 require (
 	github.com/goph/emperror v0.17.3-0.20190703203600-60a8d9faa17b
-	github.com/gorilla/websocket v1.5.1
+	github.com/gorilla/websocket v1.5.2
 	github.com/kr/pretty v0.3.0 // indirect
 	github.com/stretchr/testify v1.9.0
 	github.com/ugorji/go v1.2.7 // indirect
