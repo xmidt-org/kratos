@@ -160,8 +160,9 @@ func createConnection(headerInfo *clientHeader, httpURL string) (connection *web
 
 		connection, resp, err = websocket.DefaultDialer.Dial(wsURL, headers)
 	}
-
-	defer resp.Body.Close()
+	if resp != nil {
+		defer resp.Body.Close()
+	}
 
 	if err != nil {
 		if resp != nil {
