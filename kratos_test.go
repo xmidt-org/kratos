@@ -95,25 +95,6 @@ var (
 )
 
 /****************** BEGIN MOCK DECLARATIONS ***********************/
-type mockClient struct {
-	mock.Mock
-}
-
-func (m *mockClient) Hostname() string {
-	arguments := m.Called()
-	return arguments.String(0)
-}
-
-func (m *mockClient) Send(message interface{}) error {
-	arguments := m.Called(message)
-	return arguments.Error(0)
-}
-
-func (m *mockClient) Close() error {
-	arguments := m.Called()
-	return arguments.Error(0)
-}
-
 type mockConnection struct {
 	mock.Mock
 }
@@ -160,7 +141,7 @@ func TestMain(m *testing.M) {
 
 	clientConfig.DestinationURL = testServer.URL
 
-	wrpMsg := wrp.SimpleRequestResponse{
+	wrpMsg := wrp.SimpleRequestResponse{ //nolint: staticcheck
 		Source:          "mac:ffffff112233/emu",
 		Destination:     "/bar",
 		TransactionUUID: "emu:unique",

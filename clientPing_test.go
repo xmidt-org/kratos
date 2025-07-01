@@ -68,7 +68,7 @@ func TestPing(t *testing.T) {
 		pinged <- "ping"
 	}()
 
-	time.Sleep(50)
+	time.Sleep(50) //nolint:staticcheck
 
 	newClient.checkPing(pingTimer, pinged)
 

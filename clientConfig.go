@@ -18,9 +18,6 @@ import (
 const (
 	// Time allowed to write a message to the peer.
 	writeWait = time.Duration(10) * time.Second
-
-	// Time allowed to read the next pong message from the peer.
-	pongWait = 60 * time.Second
 )
 
 var (
@@ -157,12 +154,14 @@ func createConnection(headerInfo *clientHeader, httpURL string) (connection *web
 
 	// creates a new client connection given the URL string
 	connection, resp, err := websocket.DefaultDialer.Dial(wsURL, headers)
-
-	for err == websocket.ErrBadHandshake && resp != nil && resp.StatusCode == http.StatusTemporaryRedirect {
+	for errors.Is(err, websocket.ErrBadHandshake) && resp != nil && resp.StatusCode == http.StatusTemporaryRedirect {
 		// Get url to which we are redirected and reconfigure it
 		wsURL = strings.Replace(resp.Header.Get("Location"), "http", "ws", 1)
 
 		connection, resp, err = websocket.DefaultDialer.Dial(wsURL, headers)
+	}
+	if resp != nil {
+		defer resp.Body.Close()
 	}
 
 	if err != nil {
