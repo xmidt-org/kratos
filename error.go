@@ -6,7 +6,7 @@ package kratos
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 
@@ -46,7 +46,7 @@ type httpError struct {
 func createHTTPError(resp *http.Response, err error) *httpError {
 	var msg Message
 	defer resp.Body.Close()
-	data, _ := ioutil.ReadAll(resp.Body)
+	data, _ := io.ReadAll(resp.Body)
 	json.Unmarshal(data, &msg)
 
 	if msg.Body == "" {
