@@ -25,6 +25,16 @@ jobs:
       copyright-skip: true
       lint-skip:      true
       style-skip:     true
+      release-arch-arm64:    true
+      release-arch-amd64:    true
+      release-docker:        true
+      release-docker-latest: true
+      release-docker-major:  true
+      release-docker-minor:  true
+      release-docker-extras: |
+        .release/docker
+        LICENSE
+        NOTICE
       release-type:   library
       yaml-lint-skip: false
     secrets: inherit
